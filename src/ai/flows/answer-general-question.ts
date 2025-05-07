@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for answering general knowledge questions, potentially with image or file context,
@@ -64,7 +65,7 @@ const answerGeneralQuestionPrompt = ai.definePrompt({
   name: 'answerGeneralQuestionPrompt',
   input: {schema: AnswerGeneralQuestionPromptInputSchema}, // Prompt expects the schema with pre-processed fields and history
   output: {schema: AnswerGeneralQuestionOutputSchema},
-  prompt: `You are a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions or instructions. Use the provided conversation history to maintain context and provide relevant follow-up responses. Use a warm and approachable tone with conversational language.
+  prompt: `You are Yanino, a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions or instructions. Use the provided conversation history to maintain context and provide relevant follow-up responses. Use a warm and approachable tone with conversational language.
 
 When providing code snippets, please enclose them in markdown code blocks with the language specified, for example:
 \`\`\`html
@@ -157,7 +158,7 @@ const answerGeneralQuestionFlow = ai.defineFlow(
       let fallbackAnswer = "Sorry, I couldn't find an answer to that. I'm still learning!";
       try {
         const fallbackResponse = await ai.generate({
-          prompt: `Answer the following question in a friendly and empathetic tone: ${userInput.question}`,
+          prompt: `As Yanino, answer the following question in a friendly and empathetic tone: ${userInput.question}`,
         });
         if (fallbackResponse.text) {
           fallbackAnswer = fallbackResponse.text;

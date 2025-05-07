@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'OmniAssist Chat',
-  description: 'Your AI Powered Conversational Assistant',
+  title: 'Yanino Chat',
+  description: 'Your AI Powered Conversational Assistant, Yanino',
 };
 
 export default function RootLayout({

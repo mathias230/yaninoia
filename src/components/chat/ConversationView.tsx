@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ChatMessage } from "@/types/chat";
@@ -9,9 +10,10 @@ import { Info } from 'lucide-react';
 interface ConversationViewProps {
   messages: ChatMessage[];
   isLoading: boolean; // General loading for the conversation (e.g. initial load)
+  aiName?: string;
 }
 
-export function ConversationView({ messages, isLoading }: ConversationViewProps) {
+export function ConversationView({ messages, isLoading, aiName = "AI" }: ConversationViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +35,7 @@ export function ConversationView({ messages, isLoading }: ConversationViewProps)
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
         <Info size={48} className="text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold text-primary mb-2">Start a new conversation</h2>
+        <h2 className="text-xl font-semibold text-primary mb-2">Start a new conversation with {aiName}</h2>
         <p className="text-muted-foreground">Ask me anything or tell me what you need help with!</p>
       </div>
     );
@@ -43,10 +45,9 @@ export function ConversationView({ messages, isLoading }: ConversationViewProps)
     <ScrollArea className="flex-1 p-4 sm:p-6" ref={scrollAreaRef} viewportRef={viewportRef}>
       <div className="space-y-4">
         {messages.map((msg) => (
-          <ChatMessageBubble key={msg.id} message={msg} />
+          <ChatMessageBubble key={msg.id} message={msg} aiName={aiName} />
         ))}
       </div>
     </ScrollArea>
   );
 }
-

@@ -1,9 +1,11 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import type { ChatMessage, ChatSession } from "@/types/chat";
 import { getFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { answerGeneralQuestion, AnswerGeneralQuestionUserFacingInput } from "@/ai/flows/answer-general-question";
+import { generateChatTitle } from "@/ai/flows/generate-chat-title-flow";
 import { extractAllCodeBlocks } from "@/lib/utils";
 
 import { ChatHistorySidebar } from "@/components/chat/ChatHistorySidebar";
@@ -11,7 +13,7 @@ import { ConversationView } from "@/components/chat/ConversationView";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { PanelLeft, Settings, LogOut, Mic, HelpCircle, Edit3 } from "lucide-react";
+import { PanelLeft, Settings, LogOut, Mic, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -23,11 +25,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NextImage from 'next/image';
-import { Input } from "@/components/ui/input"; // For rename input
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // For rename dialog
+import { Input } from "@/components/ui/input"; 
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"; 
 
 
-const CHAT_SESSIONS_KEY = "chatSessionsOmniAssist"; 
+const CHAT_SESSIONS_KEY = "chatSessionsYanino"; 
+const DEFAULT_CHAT_TITLE = "New Chat with Yanino";
 
 export default function ChatPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -64,7 +67,7 @@ export default function ChatPage() {
     const newChatId = crypto.randomUUID();
     const newChatSession: ChatSession = {
       id: newChatId,
-      title: "New Conversation",
+      title: DEFAULT_CHAT_TITLE,
       messages: [],
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -171,7 +174,7 @@ export default function ChatPage() {
 
     if (currentChatId === null || currentSessionIndex === -1) {
         currentChatId = handleCreateNewChat();
-        currentSessionIndex = 0; // New chat is at the top
+        currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId);
     }
     
     if (!currentChatId) return; 
@@ -184,33 +187,18 @@ export default function ChatPage() {
       image: attachments?.image,
       file: attachments?.file,
     };
-
-    const currentChatMessages = chatSessions[currentSessionIndex]?.messages || [];
-    const conversationHistoryForAI = currentChatMessages
-      .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) 
-      .map(msg => ({
-        sender: msg.sender,
-        content: msg.content || (msg.image ? "[User sent an image]" : msg.file ? `[User sent a file: ${msg.file.name}]` : "[Empty message]")
-      }));
+    
+    // Important: Keep a reference to the current session *before* adding the user message,
+    // to check if it's the very first message for title generation later.
+    const sessionBeforeUserMessage = chatSessions[currentSessionIndex];
+    const isFirstUserMessageInSession = sessionBeforeUserMessage?.messages.filter(m => m.sender === 'user' && !m.isLoading).length === 0;
 
 
     setChatSessions((prevSessions) =>
       prevSessions.map((session) => {
         if (session.id === currentChatId) {
-          let newTitle = session.title;
-          const isDefaultTitle = session.title === "New Conversation" || session.messages.length === 0;
-          if (isDefaultTitle && session.messages.filter(m => !m.isLoading).length === 0) { 
-            if (messageContent) {
-              newTitle = messageContent.substring(0, 35) + (messageContent.length > 35 ? "..." : "");
-            } else if (attachments?.image) {
-              newTitle = "Image Analysis";
-            } else if (attachments?.file) {
-              newTitle = `File: ${attachments.file.name.substring(0,25)}...`;
-            }
-          }
           return {
             ...session,
-            title: newTitle,
             messages: [...session.messages, userMessage],
             updatedAt: new Date(),
           };
@@ -239,6 +227,14 @@ export default function ChatPage() {
           : session
       )
     );
+    
+    // Prepare conversation history for AI (excluding the current user message if it's the first one)
+    const conversationHistoryForAI = (sessionBeforeUserMessage?.messages || [])
+      .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) 
+      .map(msg => ({
+        sender: msg.sender,
+        content: msg.content || (msg.image ? "[User sent an image]" : msg.file ? `[User sent a file: ${msg.file.name}]` : "[Empty message]")
+      }));
 
     try {
       const aiInput: AnswerGeneralQuestionUserFacingInput = { 
@@ -276,6 +272,33 @@ export default function ChatPage() {
           return session;
         })
       );
+
+      // Title generation logic: if it was the first user message and title is default
+      if (isFirstUserMessageInSession && sessionBeforeUserMessage?.title === DEFAULT_CHAT_TITLE && currentChatId) {
+        try {
+          const titleResponse = await generateChatTitle({
+            userMessage: userMessage.content || (userMessage.image ? "Image received" : userMessage.file ? `File received: ${userMessage.file.name}` : "Interaction started"),
+            aiMessage: aiMessage.content,
+          });
+          if (titleResponse.title) {
+            setChatSessions((prevSessions) =>
+              prevSessions.map((session) =>
+                session.id === currentChatId
+                  ? { ...session, title: titleResponse.title, updatedAt: new Date() }
+                  : session
+              ).sort((a, b) => { 
+                if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+                return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+              })
+            );
+          }
+        } catch (titleError) {
+          console.warn("Failed to generate chat title:", titleError);
+          // Keep default title or a simpler one if title generation fails
+        }
+      }
+
+
     } catch (error) {
       console.error("Error getting AI response:", error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
@@ -350,12 +373,12 @@ export default function ChatPage() {
         <header className="p-3 border-b bg-card/80 backdrop-blur-sm flex items-center justify-between print:hidden">
           <div className="sm:hidden flex-1"> 
              <h1 className="text-lg font-semibold truncate text-center">
-              {activeChat?.title || "OmniAssist"}
+              {activeChat?.title || "Yanino"}
             </h1>
           </div>
           <div className="hidden sm:flex flex-1 items-center"> 
              <h1 className="text-xl font-semibold text-primary pl-3">
-              {activeChat?.title || "OmniAssist"}
+              {activeChat?.title || "Yanino"}
             </h1>
           </div>
           
@@ -398,6 +421,7 @@ export default function ChatPage() {
         <ConversationView
           messages={activeChat?.messages || []}
           isLoading={!activeChat && chatSessions.length > 0}
+          aiName="Yanino"
         />
         <ChatInput
           onSendMessage={handleSendMessage}

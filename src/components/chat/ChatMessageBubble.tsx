@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ChatMessage } from "@/types/chat";
@@ -10,9 +11,10 @@ import { CodeDisplay } from "./CodeDisplay"; // Import CodeDisplay
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
+  aiName?: string;
 }
 
-export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleProps) {
   const isUser = message.sender === "user";
   const hasImage = !!message.image || (message.file && message.file.type.startsWith("image/"));
   const imageData = message.image || (message.file && message.file.type.startsWith("image/") ? message.file.dataUri : undefined);
@@ -29,8 +31,8 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
     >
       {!isUser && (
         <Avatar className="h-8 w-8 bg-accent text-accent-foreground flex-shrink-0">
-          <AvatarImage asChild src="https://picsum.photos/32/32?random=1" data-ai-hint="robot ai">
-            <NextImage src="https://picsum.photos/32/32?random=1" alt="AI Avatar" width={32} height={32} />
+          <AvatarImage asChild src="https://picsum.photos/seed/aiAvatarYanino/32/32" data-ai-hint="robot ai">
+            <NextImage src="https://picsum.photos/seed/aiAvatarYanino/32/32" alt={`${aiName} Avatar`} width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <Bot size={18} />
@@ -97,8 +99,8 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       </div>
       {isUser && (
         <Avatar className="h-8 w-8 bg-secondary text-secondary-foreground flex-shrink-0">
-           <AvatarImage asChild src="https://picsum.photos/32/32?random=2" data-ai-hint="person user">
-            <NextImage src="https://picsum.photos/32/32?random=2" alt="User Avatar" width={32} height={32} />
+           <AvatarImage asChild src="https://picsum.photos/seed/userAvatarChat/32/32" data-ai-hint="person user">
+            <NextImage src="https://picsum.photos/seed/userAvatarChat/32/32" alt="User Avatar" width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <User size={18} />
