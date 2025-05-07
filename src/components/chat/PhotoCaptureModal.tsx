@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'; // Removed DialogClose as it's part of DialogContent now
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -14,7 +14,7 @@ interface PhotoCaptureModalProps {
   onPhotoCapture: (dataUri: string) => void;
 }
 
-const MAX_WIDTH = 640; // Max width for captured photo
+const MAX_WIDTH = 640; 
 
 export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCaptureModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,14 +48,14 @@ export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCapt
           videoRef.current.srcObject = mediaStream;
         }
       } catch (error) {
-        console.error('Error accessing camera:', error);
+        console.error('Error al acceder a la cámara:', error);
         setHasCameraPermission(false);
         toast({
           variant: 'destructive',
-          title: 'Camera Access Denied',
-          description: 'Please enable camera permissions in your browser settings.',
+          title: 'Acceso a la Cámara Denegado',
+          description: 'Por favor, habilita los permisos de cámara en la configuración de tu navegador.',
         });
-        onClose(); // Close modal if permission denied
+        onClose(); 
       }
     };
 
@@ -71,7 +71,6 @@ export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCapt
       const video = videoRef.current;
       const canvas = canvasRef.current;
       
-      // Calculate dimensions to maintain aspect ratio
       const aspectRatio = video.videoWidth / video.videoHeight;
       let width = video.videoWidth;
       let height = video.videoHeight;
@@ -87,14 +86,14 @@ export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCapt
       const context = canvas.getContext('2d');
       if (context) {
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUri = canvas.toDataURL('image/jpeg'); // Or image/png
+        const dataUri = canvas.toDataURL('image/jpeg'); 
         onPhotoCapture(dataUri);
         onClose();
       } else {
-         toast({ variant: "destructive", title: "Capture Error", description: "Could not get canvas context."});
+         toast({ variant: "destructive", title: "Error de Captura", description: "No se pudo obtener el contexto del lienzo."});
       }
     } else {
-         toast({ variant: "destructive", title: "Capture Error", description: "Camera not ready or permission denied."});
+         toast({ variant: "destructive", title: "Error de Captura", description: "La cámara no está lista o el permiso fue denegado."});
     }
   };
 
@@ -102,17 +101,17 @@ export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCapt
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-[700px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Camera /> Take a Photo</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><Camera /> Tomar una Foto</DialogTitle>
         </DialogHeader>
         
         <div className="my-4">
-          {hasCameraPermission === null && <p>Requesting camera permission...</p>}
+          {hasCameraPermission === null && <p>Solicitando permiso de cámara...</p>}
           {hasCameraPermission === false && (
              <Alert variant="destructive">
               <XCircle className="h-4 w-4"/>
-              <AlertTitle>Camera Access Required</AlertTitle>
+              <AlertTitle>Acceso a la Cámara Requerido</AlertTitle>
               <AlertDescription>
-                Camera permission was denied or is unavailable. Please check your browser settings.
+                El permiso de cámara fue denegado o no está disponible. Por favor, revisa la configuración de tu navegador.
               </AlertDescription>
             </Alert>
           )}
@@ -122,12 +121,13 @@ export function PhotoCaptureModal({ isOpen, onClose, onPhotoCapture }: PhotoCapt
         </div>
 
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleCapture} disabled={!hasCameraPermission || !stream} className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            <Zap className="mr-2 h-4 w-4" /> Capture Photo
+            <Zap className="mr-2 h-4 w-4" /> Capturar Foto
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+

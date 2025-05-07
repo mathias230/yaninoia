@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,19 +39,18 @@ export function CodeDisplay({ blocks }: CodeDisplayProps) {
         <TabsList className={`grid w-full ${hasPreviewableHtml ? 'grid-cols-2' : 'grid-cols-1'}`}>
           {hasPreviewableHtml && (
             <TabsTrigger value="preview">
-              Preview
+              Vista Previa
             </TabsTrigger>
           )}
-          <TabsTrigger value="code">Code</TabsTrigger>
+          <TabsTrigger value="code">Código</TabsTrigger>
         </TabsList>
         {hasPreviewableHtml && htmlBlock && (
           <TabsContent value="preview" className="p-0">
-            {/* CardContent is removed here to avoid double padding when TabsContent has p-0 */}
             <iframe
               srcDoc={htmlBlock.code}
-              title="Code Preview"
-              sandbox="allow-scripts allow-same-origin" // allow-same-origin might be needed for some JS interactions
-              className="w-full h-80 border-0 rounded-b-md" // Increased height
+              title="Vista Previa del Código"
+              sandbox="allow-scripts allow-same-origin" 
+              className="w-full h-80 border-0 rounded-b-md" 
               loading="lazy"
             />
           </TabsContent>
@@ -67,10 +67,11 @@ export function CodeDisplay({ blocks }: CodeDisplayProps) {
                 </pre>
               </div>
             ))}
-            {blocks.length === 0 && <p className="text-sm text-muted-foreground">No code blocks to display.</p>}
+            {blocks.length === 0 && <p className="text-sm text-muted-foreground">No hay bloques de código para mostrar.</p>}
           </CardContent>
         </TabsContent>
       </Tabs>
     </Card>
   );
 }
+

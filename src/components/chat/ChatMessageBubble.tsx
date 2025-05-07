@@ -6,15 +6,15 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bot, Loader2, User, FileText, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import NextImage from "next/image"; // Renamed to avoid conflict
-import { CodeDisplay } from "./CodeDisplay"; // Import CodeDisplay
+import NextImage from "next/image"; 
+import { CodeDisplay } from "./CodeDisplay"; 
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
   aiName?: string;
 }
 
-export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleProps) {
   const isUser = message.sender === "user";
   const hasImage = !!message.image || (message.file && message.file.type.startsWith("image/"));
   const imageData = message.image || (message.file && message.file.type.startsWith("image/") ? message.file.dataUri : undefined);
@@ -25,35 +25,35 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
   return (
     <div
       className={cn(
-        "flex items-start gap-3 mb-4 w-full", // Ensure bubble can take full width for CodeDisplay
+        "flex items-start gap-3 mb-4 w-full", 
         isUser ? "justify-end" : "justify-start"
       )}
     >
       {!isUser && (
         <Avatar className="h-8 w-8 bg-accent text-accent-foreground flex-shrink-0">
           <AvatarImage asChild src="https://picsum.photos/seed/aiAvatarYanino/32/32" data-ai-hint="robot ai">
-            <NextImage src="https://picsum.photos/seed/aiAvatarYanino/32/32" alt={`${aiName} Avatar`} width={32} height={32} />
+            <NextImage src="https://picsum.photos/seed/aiAvatarYanino/32/32" alt={`Avatar de ${aiName}`} width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <Bot size={18} />
           </AvatarFallback>
         </Avatar>
       )}
-      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85%] w-auto")}> {/* Adjust width for content + code */}
+      <div className={cn("flex flex-col", isUser ? "items-end" : "items-start", "max-w-[85%] w-auto")}> 
         <Card
           className={cn(
             "rounded-xl shadow-md p-0",
             isUser
               ? "bg-primary text-primary-foreground"
               : "bg-card text-card-foreground",
-            "w-auto min-w-[50px]" // Ensure card has some minimum width
+            "w-auto min-w-[50px]" 
           )}
         >
           <CardContent className="p-3">
             {message.isLoading ? (
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Thinking...</span>
+                <span>Pensando...</span>
               </div>
             ) : (
               <>
@@ -61,7 +61,7 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
                   <div className="mb-2 rounded-md overflow-hidden max-h-80">
                     <NextImage 
                       src={imageData} 
-                      alt={message.file?.name || "User uploaded image"} 
+                      alt={message.file?.name || "Imagen subida por el usuario"} 
                       width={300} 
                       height={200} 
                       className="object-contain w-full h-auto max-h-80" 
@@ -76,7 +76,6 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
                     <span className="text-sm truncate" title={message.file.name}>{message.file.name}</span>
                   </div>
                 )}
-                {/* Render message content only if it's not entirely captured by code blocks or if there's no code */}
                 {message.content && (!hasCode || (hasCode && !message.extractedCodeBlocks?.every(block => message.content.includes(`\`\`\`${block.language || ''}\n${block.code}\n\`\`\``)))) && (
                    <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
                 )}
@@ -84,7 +83,7 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
                   <p className="whitespace-pre-wrap text-sm sm:text-base italic opacity-80">
                     {imageData && <ImageIcon size={14} className="inline mr-1"/>}
                     {hasGenericFile && <FileText size={14} className="inline mr-1"/>}
-                    Sent attachment
+                    Adjunto enviado
                   </p>
                 )}
               </>
@@ -92,7 +91,7 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
           </CardContent>
         </Card>
         {hasCode && !message.isLoading && (
-           <div className="w-full mt-1"> {/* Ensure CodeDisplay takes appropriate width */}
+           <div className="w-full mt-1"> 
             <CodeDisplay blocks={message.extractedCodeBlocks!} />
            </div>
         )}
@@ -100,7 +99,7 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
       {isUser && (
         <Avatar className="h-8 w-8 bg-secondary text-secondary-foreground flex-shrink-0">
            <AvatarImage asChild src="https://picsum.photos/seed/userAvatarChat/32/32" data-ai-hint="person user">
-            <NextImage src="https://picsum.photos/seed/userAvatarChat/32/32" alt="User Avatar" width={32} height={32} />
+            <NextImage src="https://picsum.photos/seed/userAvatarChat/32/32" alt="Avatar de Usuario" width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <User size={18} />
@@ -110,3 +109,4 @@ export function ChatMessageBubble({ message, aiName = "AI" }: ChatMessageBubbleP
     </div>
   );
 }
+

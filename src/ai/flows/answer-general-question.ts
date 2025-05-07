@@ -1,58 +1,58 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow for answering general knowledge questions, potentially with image or file context,
- * and awareness of the preceding conversation.
+ * @fileOverview Un flujo de Genkit para responder preguntas de conocimiento general, potencialmente con contexto de imagen o archivo,
+ * y conciencia de la conversación precedente.
  *
- * - answerGeneralQuestion - A function that takes a user's question, optional attachments, and conversation history, then returns an answer.
- * - AnswerGeneralQuestionUserFacingInput - The input type for the answerGeneralQuestion function.
- * - AnswerGeneralQuestionOutput - The return type for the answerGeneralQuestion function.
+ * - answerGeneralQuestion - Una función que toma la pregunta del usuario, adjuntos opcionales e historial de conversación, luego devuelve una respuesta.
+ * - AnswerGeneralQuestionUserFacingInput - El tipo de entrada para la función answerGeneralQuestion.
+ * - AnswerGeneralQuestionOutput - El tipo de retorno para la función answerGeneralQuestion.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-// Schema for individual history message
+// Esquema para mensaje individual del historial
 const ConversationMessageSchema = z.object({
-  sender: z.enum(["user", "ai"]).describe("Who sent this message in the history."),
-  content: z.string().describe("The text content of the historical message.")
+  sender: z.enum(["user", "ai"]).describe("Quién envió este mensaje en el historial."),
+  content: z.string().describe("El contenido de texto del mensaje histórico.")
 });
 
-// Schema for the input the prompt itself expects (internal, includes pre-processed fields)
+// Esquema para la entrada que el prompt mismo espera (interno, incluye campos preprocesados)
 const AnswerGeneralQuestionPromptInputSchema = z.object({
-  question: z.string().describe('The current question or instruction asked by the user.'),
-  imageDataUri: z.string().optional().describe("An optional image provided by the user with the current question, as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."),
+  question: z.string().describe('La pregunta o instrucción actual hecha por el usuario.'),
+  imageDataUri: z.string().optional().describe("Una imagen opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
   fileData: z.object({
-    name: z.string().describe('The name of the uploaded file.'),
-    type: z.string().describe('The MIME type of the uploaded file.'),
-    dataUri: z.string().describe("The content of the uploaded file, as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."),
-  }).optional().describe('An optional file provided by the user with the current question for analysis, summarization, or to answer questions about.'),
-  conversationHistory: z.array(ConversationMessageSchema).optional().describe('The history of the current conversation, ordered from oldest to newest. Use this to maintain context.'),
-  // Fields for pre-processed file data, to be populated by the flow for the prompt
-  fileIsText: z.boolean().optional().describe('Internal field: Whether the uploaded file is determined to be a text file.'),
-  fileTextPreview: z.string().optional().describe('Internal field: A preview of the text content (first 2000 chars) if the file is text-based.')
+    name: z.string().describe('El nombre del archivo subido.'),
+    type: z.string().describe('El tipo MIME del archivo subido.'),
+    dataUri: z.string().describe("El contenido del archivo subido, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
+  }).optional().describe('Un archivo opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él.'),
+  conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo. Úsalo para mantener el contexto.'),
+  // Campos para datos de archivo preprocesados, a ser poblados por el flujo para el prompt
+  fileIsText: z.boolean().optional().describe('Campo interno: Si el archivo subido se determina que es un archivo de texto.'),
+  fileTextPreview: z.string().optional().describe('Campo interno: Una vista previa del contenido de texto (primeros 2000 caracteres) si el archivo es basado en texto.')
 });
-// This type is for internal use within the flow, for the prompt.
+// Este tipo es para uso interno dentro del flujo, para el prompt.
 type AnswerGeneralQuestionPromptInput = z.infer<typeof AnswerGeneralQuestionPromptInputSchema>;
 
 
-// Schema for the input the user-facing exported function and the flow will take
+// Esquema para la entrada que la función exportada de cara al usuario y el flujo tomarán
 const AnswerGeneralQuestionUserFacingInputSchema = z.object({
-  question: z.string().describe('The current question or instruction asked by the user.'),
-  imageDataUri: z.string().optional().describe("An optional image provided by the user with the current question, as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."),
+  question: z.string().describe('La pregunta o instrucción actual hecha por el usuario.'),
+  imageDataUri: z.string().optional().describe("Una imagen opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
   fileData: z.object({
-    name: z.string().describe('The name of the uploaded file.'),
-    type: z.string().describe('The MIME type of the uploaded file.'),
-    dataUri: z.string().describe("The content of the uploaded file, as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."),
-  }).optional().describe('An optional file provided by the user with the current question for analysis, summarization, or to answer questions about.'),
-  conversationHistory: z.array(ConversationMessageSchema).optional().describe('The history of the current conversation, ordered from oldest to newest. Use this to maintain context.'),
+    name: z.string().describe('El nombre del archivo subido.'),
+    type: z.string().describe('El tipo MIME del archivo subido.'),
+    dataUri: z.string().describe("El contenido del archivo subido, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
+  }).optional().describe('Un archivo opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él.'),
+  conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo. Úsalo para mantener el contexto.'),
 });
 export type AnswerGeneralQuestionUserFacingInput = z.infer<typeof AnswerGeneralQuestionUserFacingInputSchema>;
 
 
 const AnswerGeneralQuestionOutputSchema = z.object({
-  answer: z.string().describe('The AI-generated answer to the question/instruction.'),
-  originalQuestion: z.string().describe('The original question or instruction that was processed.')
+  answer: z.string().describe('La respuesta generada por IA a la pregunta/instrucción.'),
+  originalQuestion: z.string().describe('La pregunta o instrucción original que fue procesada.')
 });
 export type AnswerGeneralQuestionOutput = z.infer<typeof AnswerGeneralQuestionOutputSchema>;
 
@@ -63,85 +63,81 @@ export async function answerGeneralQuestion(input: AnswerGeneralQuestionUserFaci
 
 const answerGeneralQuestionPrompt = ai.definePrompt({
   name: 'answerGeneralQuestionPrompt',
-  input: {schema: AnswerGeneralQuestionPromptInputSchema}, // Prompt expects the schema with pre-processed fields and history
+  input: {schema: AnswerGeneralQuestionPromptInputSchema}, 
   output: {schema: AnswerGeneralQuestionOutputSchema},
-  prompt: `You are Yanino, a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions or instructions. Use the provided conversation history to maintain context and provide relevant follow-up responses. Use a warm and approachable tone with conversational language.
+  prompt: `Eres Yanino, un asistente de IA amigable y empático. Tu objetivo es proporcionar respuestas claras, concisas y precisas a las preguntas o instrucciones del usuario. Utiliza el historial de conversación proporcionado para mantener el contexto y ofrecer respuestas de seguimiento relevantes. Usa un tono cálido y accesible con un lenguaje conversacional.
 
-When providing code snippets, please enclose them in markdown code blocks with the language specified, for example:
+Al proporcionar fragmentos de código, por favor, enciérralos en bloques de código markdown con el lenguaje especificado, por ejemplo:
 \`\`\`html
-<p>Hello</p>
+<p>Hola</p>
 \`\`\`
 \`\`\`javascript
-console.log('world');
+console.log('mundo');
 \`\`\`
 
 {{#if conversationHistory}}
---- Conversation History (Oldest to Newest) ---
+--- Historial de Conversación (Del más antiguo al más nuevo) ---
 {{#each conversationHistory}}
 {{this.sender}}: {{this.content}}
 {{/each}}
---- End of Conversation History ---
+--- Fin del Historial de Conversación ---
 
-Now, considering the history above, please respond to the following:
+Ahora, considerando el historial anterior, por favor responde a lo siguiente:
 {{/if}}
 
-User's Current Input: {{{question}}}
+Entrada Actual del Usuario: {{{question}}}
 
 {{#if imageDataUri}}
-The user has also provided an image with their current input. Analyze this image as part of your response:
+El usuario también ha proporcionado una imagen con su entrada actual. Analiza esta imagen como parte de tu respuesta:
 {{media url=imageDataUri}}
 {{/if}}
 
 {{#if fileData}}
-The user has also uploaded a file named "{{fileData.name}}" (type: {{fileData.type}}) with their current input.
-Please analyze its content and help the user with it. You can assist with understanding, summarizing, or answering questions about this file.
-File Reference: {{fileData.name}} (type: {{fileData.type}})
+El usuario también ha subido un archivo llamado "{{fileData.name}}" (tipo: {{fileData.type}}) con su entrada actual.
+Por favor, analiza su contenido y ayuda al usuario con él. Puedes ayudar a entender, resumir o responder preguntas sobre este archivo.
+Referencia del Archivo: {{fileData.name}} (tipo: {{fileData.type}})
 {{#if fileIsText}}
-File Content (first 2000 characters):
+Contenido del Archivo (primeros 2000 caracteres):
 \`\`\`
 {{{fileTextPreview}}}
 \`\`\`
 {{else}}
-This is a non-text file. You can discuss its potential contents or uses based on its name and type.
+Este es un archivo no textual. Puedes discutir sus posibles contenidos o usos basándote en su nombre y tipo.
 {{/if}}
 {{/if}}
 
-Provide your answer in the 'answer' field.
-Also, return the original current question in the 'originalQuestion' field, which should be the user's textual input for the current turn.
+Proporciona tu respuesta en el campo 'answer'.
+También, devuelve la pregunta actual original en el campo 'originalQuestion', que debe ser la entrada textual del usuario para el turno actual.
 `,
 });
 
 
-// Helper to convert data URI to string, assuming UTF-8 for text files
 const dataUriToString = (dataUri: string): string => {
   try {
     const base64Part = dataUri.substring(dataUri.indexOf(',') + 1);
-    // Node.js Buffer for server-side
     if (typeof Buffer !== 'undefined') {
       return Buffer.from(base64Part, 'base64').toString('utf-8');
     }
-    // Basic browser-side decoding (less robust for all charsets)
     return atob(base64Part);
   } catch (e) {
-    console.warn("Failed to decode data URI to string", e);
-    return "[Could not decode file content]";
+    console.warn("No se pudo decodificar el URI de datos a cadena", e);
+    return "[No se pudo decodificar el contenido del archivo]";
   }
 };
 
 const answerGeneralQuestionFlow = ai.defineFlow(
   {
     name: 'answerGeneralQuestionFlow',
-    inputSchema: AnswerGeneralQuestionUserFacingInputSchema, // Flow's input is user-facing
+    inputSchema: AnswerGeneralQuestionUserFacingInputSchema, 
     outputSchema: AnswerGeneralQuestionOutputSchema,
   },
   async (userInput: AnswerGeneralQuestionUserFacingInput) => { 
     
-    // Construct the input for the prompt, including any pre-processing
     const promptInput: AnswerGeneralQuestionPromptInput = { 
       question: userInput.question,
       imageDataUri: userInput.imageDataUri,
       fileData: userInput.fileData,
-      conversationHistory: userInput.conversationHistory, // Pass through history
+      conversationHistory: userInput.conversationHistory, 
     };
 
     if (userInput.fileData) {
@@ -155,16 +151,16 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     const {output} = await answerGeneralQuestionPrompt(promptInput); 
     
     if (!output) {
-      let fallbackAnswer = "Sorry, I couldn't find an answer to that. I'm still learning!";
+      let fallbackAnswer = "Lo siento, no pude encontrar una respuesta a eso. ¡Todavía estoy aprendiendo!";
       try {
         const fallbackResponse = await ai.generate({
-          prompt: `As Yanino, answer the following question in a friendly and empathetic tone: ${userInput.question}`,
+          prompt: `Como Yanino, responde la siguiente pregunta en un tono amigable y empático: ${userInput.question}`,
         });
         if (fallbackResponse.text) {
           fallbackAnswer = fallbackResponse.text;
         }
       } catch (e) {
-        console.error("Error during fallback generation:", e);
+        console.error("Error durante la generación de respaldo:", e);
       }
       return {
         answer: fallbackAnswer,
@@ -177,3 +173,4 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     };
   }
 );
+

@@ -43,23 +43,22 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
       if (file.size > MAX_FILE_SIZE_BYTES) {
         toast({
           variant: "destructive",
-          title: "File too large",
-          description: `Please select a file smaller than ${MAX_FILE_SIZE_MB}MB.`,
+          title: "Archivo demasiado grande",
+          description: `Por favor, selecciona un archivo menor de ${MAX_FILE_SIZE_MB}MB.`,
         });
-        event.target.value = ""; // Reset input
+        event.target.value = ""; 
         return;
       }
       if (type === "image") {
         setSelectedImage(file);
-        setSelectedFile(null); // Can only have one or the other for simplicity in this UI
-         toast({ title: "Image Selected", description: file.name });
+        setSelectedFile(null); 
+         toast({ title: "Imagen Seleccionada", description: file.name });
       } else {
         setSelectedFile(file);
         setSelectedImage(null);
-        toast({ title: "File Selected", description: file.name });
+        toast({ title: "Archivo Seleccionado", description: file.name });
       }
     }
-     // Reset file input to allow selecting the same file again
     if (event.target) {
       event.target.value = "";
     }
@@ -84,7 +83,6 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         };
       }
 
-      // Ensure onSendMessage is called with a structure it expects
       if (attachments && 'image' in attachments) {
          onSendMessage(textContent, { image: attachments.image });
       } else if (attachments && 'file' in attachments) {
@@ -97,19 +95,18 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
       setSelectedImage(null);
       setSelectedFile(null);
     } catch (error) {
-      console.error("Error processing file for sending:", error);
+      console.error("Error al procesar el archivo para enviar:", error);
       toast({
         variant: "destructive",
-        title: "File Error",
-        description: "Could not read or process the selected file.",
+        title: "Error de Archivo",
+        description: "No se pudo leer o procesar el archivo seleccionado.",
       });
     }
   };
   
   const handlePhotoCaptured = async (dataUri: string) => {
-    // To treat captured photo as an image attachment
     onSendMessage(inputValue.trim(), { image: dataUri });
-    setInputValue(""); // Clear input after sending
+    setInputValue(""); 
     setIsPhotoModalOpen(false);
   };
 
@@ -128,10 +125,10 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
     <>
       <div className="p-4 sm:p-6 border-t bg-background">
         <div className="flex items-end gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setIsPhotoModalOpen(true)} disabled={isLoading} aria-label="Take a photo">
+          <Button variant="ghost" size="icon" onClick={() => setIsPhotoModalOpen(true)} disabled={isLoading} aria-label="Tomar una foto">
             <CameraIcon className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={triggerImageInput} disabled={isLoading} aria-label="Upload image">
+          <Button variant="ghost" size="icon" onClick={triggerImageInput} disabled={isLoading} aria-label="Subir imagen">
             <ImagePlus className="h-5 w-5" />
           </Button>
           <input
@@ -141,7 +138,7 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
             onChange={(e) => handleFileChange(e, "image")}
             className="hidden"
           />
-          <Button variant="ghost" size="icon" onClick={triggerFileInput} disabled={isLoading} aria-label="Upload file">
+          <Button variant="ghost" size="icon" onClick={triggerFileInput} disabled={isLoading} aria-label="Subir archivo">
             <Paperclip className="h-5 w-5" />
           </Button>
           <input
@@ -156,16 +153,16 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              selectedImage ? `Describe the image "${selectedImage.name}" or ask a question...` :
-              selectedFile ? `Ask about the file "${selectedFile.name}"...` :
-              "Type your message or upload a file..."
+              selectedImage ? `Describe la imagen "${selectedImage.name}" o haz una pregunta...` :
+              selectedFile ? `Pregunta sobre el archivo "${selectedFile.name}"...` :
+              "Escribe tu mensaje o sube un archivo..."
             }
             className="flex-1 resize-none min-h-[40px] max-h-[200px] text-base"
             rows={1}
             disabled={isLoading}
-            aria-label="Chat message input"
+            aria-label="Entrada de mensaje de chat"
           />
-          <Button onClick={handleSubmit} disabled={isLoading || (!inputValue.trim() && !selectedImage && !selectedFile)} className="h-[40px] self-end" aria-label="Send message">
+          <Button onClick={handleSubmit} disabled={isLoading || (!inputValue.trim() && !selectedImage && !selectedFile)} className="h-[40px] self-end" aria-label="Enviar mensaje">
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
@@ -175,8 +172,8 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
         </div>
         {(selectedImage || selectedFile) && (
           <div className="mt-2 text-sm text-muted-foreground">
-            Attached: {selectedImage?.name || selectedFile?.name}
-            <Button variant="ghost" size="sm" onClick={() => {setSelectedImage(null); setSelectedFile(null);}} className="ml-2 h-auto p-1 text-xs">Clear</Button>
+            Adjunto: {selectedImage?.name || selectedFile?.name}
+            <Button variant="ghost" size="sm" onClick={() => {setSelectedImage(null); setSelectedFile(null);}} className="ml-2 h-auto p-1 text-xs">Quitar</Button>
           </div>
         )}
       </div>
@@ -188,3 +185,4 @@ export function ChatInput({ onSendMessage, isLoading }: ChatInputProps) {
     </>
   );
 }
+

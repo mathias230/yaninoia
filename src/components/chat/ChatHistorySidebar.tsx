@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ChatSession } from "@/types/chat";
@@ -6,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlusCircle, MessageSquare, Trash2, Pin, PinOff, Edit3, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale'; // Import Spanish locale for date-fns
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DropdownMenu,
@@ -23,7 +25,6 @@ interface ChatHistorySidebarProps {
   onDeleteChat: (sessionId: string) => void;
   onTogglePinChat: (sessionId: string) => void;
   onRenameChat: (sessionId: string, currentTitle: string) => void;
-  editingSessionId: string | null; // To manage rename dialog visibility
 }
 
 export function ChatHistorySidebar({
@@ -34,12 +35,11 @@ export function ChatHistorySidebar({
   onDeleteChat,
   onTogglePinChat,
   onRenameChat,
-  editingSessionId,
 }: ChatHistorySidebarProps) {
 
   const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); 
-    if (window.confirm("Are you sure you want to delete this chat session?")) {
+    if (window.confirm("¿Estás seguro de que quieres eliminar esta sesión de chat?")) {
       onDeleteChat(sessionId);
     }
   };
@@ -59,15 +59,15 @@ export function ChatHistorySidebar({
     <div className="w-full h-full sm:w-72 bg-sidebar text-sidebar-foreground border-r flex flex-col shadow-lg">
       <div className="p-4 border-b flex items-center justify-between space-x-2">
         <Button onClick={onCreateNewChat} className="flex-grow" variant="outline">
-          <PlusCircle className="mr-2 h-4 w-4" /> New Chat
+          <PlusCircle className="mr-2 h-4 w-4" /> Nuevo Chat
         </Button>
         <ThemeToggle />
       </div>
       <ScrollArea className="flex-1">
         {sessions.length === 0 ? (
           <div className="p-4 text-center text-muted-foreground">
-            <p>No chat history yet.</p>
-            <p className="text-sm">Start a new chat to begin!</p>
+            <p>Aún no hay historial de chats.</p>
+            <p className="text-sm">¡Comienza un nuevo chat para empezar!</p>
           </div>
         ) : (
           <nav className="p-2 space-y-1">
@@ -107,7 +107,7 @@ export function ChatHistorySidebar({
                       ? "text-sidebar-accent-foreground/80" 
                       : "text-muted-foreground group-hover:text-sidebar-accent-foreground/70"
                   )}>
-                    {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true, locale: es })}
                   </p>
                 </div>
 
@@ -117,8 +117,8 @@ export function ChatHistorySidebar({
                       variant="ghost" 
                       size="icon" 
                       className="h-7 w-7 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex-shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => e.stopPropagation()} // Prevent chat selection
-                      aria-label="More options"
+                      onClick={(e) => e.stopPropagation()} 
+                      aria-label="Más opciones"
                     >
                       <MoreVertical size={16} />
                     </Button>
@@ -126,15 +126,15 @@ export function ChatHistorySidebar({
                   <DropdownMenuContent side="right" align="start" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem onClick={(e) => handleTogglePinClick(e, session.id)}>
                       {session.isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                      <span>{session.isPinned ? "Unpin" : "Pin"}</span>
+                      <span>{session.isPinned ? "Desfijar" : "Fijar"}</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={(e) => handleRenameClick(e, session.id, session.title)}>
                       <Edit3 className="mr-2 h-4 w-4" />
-                      <span>Rename</span>
+                      <span>Renombrar</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onClick={(e) => handleDeleteClick(e, session.id)}>
                       <Trash2 className="mr-2 h-4 w-4" />
-                      <span>Delete</span>
+                      <span>Eliminar</span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -146,3 +146,4 @@ export function ChatHistorySidebar({
     </div>
   );
 }
+

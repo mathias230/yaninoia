@@ -9,11 +9,11 @@ import { Info } from 'lucide-react';
 
 interface ConversationViewProps {
   messages: ChatMessage[];
-  isLoading: boolean; // General loading for the conversation (e.g. initial load)
+  isLoading: boolean; 
   aiName?: string;
 }
 
-export function ConversationView({ messages, isLoading, aiName = "AI" }: ConversationViewProps) {
+export function ConversationView({ messages, isLoading, aiName = "IA" }: ConversationViewProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +26,7 @@ export function ConversationView({ messages, isLoading, aiName = "AI" }: Convers
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <p>Loading conversation...</p>
+        <p>Cargando conversación...</p>
       </div>
     );
   }
@@ -35,8 +35,8 @@ export function ConversationView({ messages, isLoading, aiName = "AI" }: Convers
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
         <Info size={48} className="text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold text-primary mb-2">Start a new conversation with {aiName}</h2>
-        <p className="text-muted-foreground">Ask me anything or tell me what you need help with!</p>
+        <h2 className="text-xl font-semibold text-primary mb-2">Inicia una nueva conversación con {aiName}</h2>
+        <p className="text-muted-foreground">¡Pregúntame cualquier cosa o dime en qué necesitas ayuda!</p>
       </div>
     );
   }
@@ -51,3 +51,4 @@ export function ConversationView({ messages, isLoading, aiName = "AI" }: Convers
     </ScrollArea>
   );
 }
+

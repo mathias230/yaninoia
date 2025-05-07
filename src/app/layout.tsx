@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Yanino Chat',
-  description: 'Your AI Powered Conversational Assistant, Yanino',
+  description: 'Tu Asistente Conversacional con IA, Yanino',
 };
 
 export default function RootLayout({
@@ -26,7 +26,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
+    <html lang="es" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`} suppressHydrationWarning>
       <body className="h-full bg-background text-foreground font-sans">
         <ThemeProvider
           attribute="class"
@@ -41,3 +41,4 @@ export default function RootLayout({
     </html>
   );
 }
+

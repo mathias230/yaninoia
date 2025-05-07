@@ -30,7 +30,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 
 
 const CHAT_SESSIONS_KEY = "chatSessionsYanino"; 
-const DEFAULT_CHAT_TITLE = "New Chat with Yanino";
+const DEFAULT_CHAT_TITLE = "Nuevo Chat con Yanino";
 
 export default function ChatPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -105,8 +105,8 @@ export default function ChatPage() {
       return updatedSessions;
     });
      toast({
-        title: "Chat Deleted",
-        description: "The conversation has been removed.",
+        title: "Chat Eliminado",
+        description: "La conversación ha sido eliminada.",
         variant: "default"
       });
   }, [activeChatSessionId, toast, handleCreateNewChat]);
@@ -123,8 +123,8 @@ export default function ChatPage() {
      const session = chatSessions.find(s => s.id === sessionId);
      if (session) {
       toast({
-        title: session.isPinned ? "Chat Unpinned" : "Chat Pinned",
-        description: `Conversation "${session.title}" ${session.isPinned ? 'unpinned.' : 'pinned.'}`
+        title: session.isPinned ? "Chat Desfijado" : "Chat Fijado",
+        description: `La conversación "${session.title}" ha sido ${session.isPinned ? 'desfijada.' : 'fijada.'}`
       });
     }
   }, [chatSessions, toast]);
@@ -136,7 +136,7 @@ export default function ChatPage() {
 
   const confirmRenameChat = () => {
     if (!editingSessionId || !renameInput.trim()) {
-      toast({ title: "Invalid Title", description: "Chat title cannot be empty.", variant: "destructive" });
+      toast({ title: "Título Inválido", description: "El título del chat no puede estar vacío.", variant: "destructive" });
       if(!renameInput.trim() && editingSessionId){
         const originalSession = chatSessions.find(s => s.id === editingSessionId);
         if(originalSession) setRenameInput(originalSession.title);
@@ -151,7 +151,7 @@ export default function ChatPage() {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       })
     );
-    toast({ title: "Chat Renamed", description: `Conversation updated to "${renameInput.trim()}".`});
+    toast({ title: "Chat Renombrado", description: `La conversación ha sido actualizada a "${renameInput.trim()}".`});
     setEditingSessionId(null);
     setRenameInput("");
   };
@@ -174,10 +174,15 @@ export default function ChatPage() {
 
     if (currentChatId === null || currentSessionIndex === -1) {
         currentChatId = handleCreateNewChat();
-        currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId);
+        currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId); 
+        // Need to update index if a new chat was just created and handleCreateNewChat is async (it's not, but good practice)
+        if (currentSessionIndex === -1) { // Safeguard
+          const newSession = chatSessions.find(session => session.id === currentChatId);
+          if (newSession) currentSessionIndex = chatSessions.indexOf(newSession);
+        }
     }
     
-    if (!currentChatId) return; 
+    if (!currentChatId || currentSessionIndex === -1) return; 
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -188,8 +193,6 @@ export default function ChatPage() {
       file: attachments?.file,
     };
     
-    // Important: Keep a reference to the current session *before* adding the user message,
-    // to check if it's the very first message for title generation later.
     const sessionBeforeUserMessage = chatSessions[currentSessionIndex];
     const isFirstUserMessageInSession = sessionBeforeUserMessage?.messages.filter(m => m.sender === 'user' && !m.isLoading).length === 0;
 
@@ -228,12 +231,11 @@ export default function ChatPage() {
       )
     );
     
-    // Prepare conversation history for AI (excluding the current user message if it's the first one)
     const conversationHistoryForAI = (sessionBeforeUserMessage?.messages || [])
       .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) 
       .map(msg => ({
         sender: msg.sender,
-        content: msg.content || (msg.image ? "[User sent an image]" : msg.file ? `[User sent a file: ${msg.file.name}]` : "[Empty message]")
+        content: msg.content || (msg.image ? "[Usuario envió una imagen]" : msg.file ? `[Usuario envió un archivo: ${msg.file.name}]` : "[Mensaje vacío]")
       }));
 
     try {
@@ -273,11 +275,10 @@ export default function ChatPage() {
         })
       );
 
-      // Title generation logic: if it was the first user message and title is default
       if (isFirstUserMessageInSession && sessionBeforeUserMessage?.title === DEFAULT_CHAT_TITLE && currentChatId) {
         try {
           const titleResponse = await generateChatTitle({
-            userMessage: userMessage.content || (userMessage.image ? "Image received" : userMessage.file ? `File received: ${userMessage.file.name}` : "Interaction started"),
+            userMessage: userMessage.content || (userMessage.image ? "Imagen recibida" : userMessage.file ? `Archivo recibido: ${userMessage.file.name}` : "Interacción iniciada"),
             aiMessage: aiMessage.content,
           });
           if (titleResponse.title) {
@@ -293,15 +294,14 @@ export default function ChatPage() {
             );
           }
         } catch (titleError) {
-          console.warn("Failed to generate chat title:", titleError);
-          // Keep default title or a simpler one if title generation fails
+          console.warn("Error al generar el título del chat:", titleError);
         }
       }
 
 
     } catch (error) {
-      console.error("Error getting AI response:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
+      console.error("Error al obtener respuesta de la IA:", error);
+      const errorMessage = error instanceof Error ? error.message : "Ocurrió un error inesperado.";
       const aiErrorMessage: ChatMessage = {
         id: aiLoadingMessageId, 
         sender: "ai",
@@ -322,7 +322,7 @@ export default function ChatPage() {
         })
       );
       toast({
-        title: "AI Error",
+        title: "Error de IA",
         description: errorMessage,
         variant: "destructive",
       });
@@ -340,7 +340,7 @@ export default function ChatPage() {
           <SheetTrigger asChild>
             <Button variant="outline" size="icon" className="rounded-full shadow-md">
               <PanelLeft className="h-5 w-5" />
-              <span className="sr-only">Toggle History</span>
+              <span className="sr-only">Alternar Historial</span>
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-80 bg-sidebar text-sidebar-foreground">
@@ -383,7 +383,7 @@ export default function ChatPage() {
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" aria-label="Start Voice Command" className="hover:bg-accent/20">
+            <Button variant="ghost" size="icon" aria-label="Iniciar Comando de Voz" className="hover:bg-accent/20">
               <Mic className="h-5 w-5 text-accent" />
             </Button>
             <DropdownMenu>
@@ -391,27 +391,27 @@ export default function ChatPage() {
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage asChild src="https://picsum.photos/seed/userProfile/40/40" data-ai-hint="female user">
-                       <NextImage src="https://picsum.photos/seed/userProfile/40/40" alt="User Avatar" width={40} height={40} />
+                       <NextImage src="https://picsum.photos/seed/userProfile/40/40" alt="Avatar de Usuario" width={40} height={40} />
                     </AvatarImage>
                     <AvatarFallback>U</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuLabel>Mi Cuenta</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
+                  <span>Configuración</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <HelpCircle className="mr-2 h-4 w-4" />
-                  <span>Support</span>
+                  <span>Soporte</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>Cerrar sesión</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -420,7 +420,7 @@ export default function ChatPage() {
 
         <ConversationView
           messages={activeChat?.messages || []}
-          isLoading={!activeChat && chatSessions.length > 0}
+          isLoading={!activeChat && chatSessions.length === 0}
           aiName="Yanino"
         />
         <ChatInput
@@ -433,23 +433,23 @@ export default function ChatPage() {
         <Dialog open={!!editingSessionId} onOpenChange={(isOpen) => !isOpen && cancelRenameChat()}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Rename Chat</DialogTitle>
+              <DialogTitle>Renombrar Chat</DialogTitle>
               <DialogDescription>
-                Enter a new title for this conversation.
+                Ingresa un nuevo título para esta conversación.
               </DialogDescription>
             </DialogHeader>
             <Input 
               value={renameInput} 
               onChange={(e) => setRenameInput(e.target.value)} 
-              placeholder="Enter new chat title"
+              placeholder="Ingresa el nuevo título del chat"
               onKeyDown={(e) => e.key === 'Enter' && confirmRenameChat()}
               className="my-4"
             />
             <DialogFooter>
               <DialogClose asChild>
-                <Button variant="outline" onClick={cancelRenameChat}>Cancel</Button>
+                <Button variant="outline" onClick={cancelRenameChat}>Cancelar</Button>
               </DialogClose>
-              <Button onClick={confirmRenameChat}>Save</Button>
+              <Button onClick={confirmRenameChat}>Guardar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -457,3 +457,4 @@ export default function ChatPage() {
     </main>
   );
 }
+
