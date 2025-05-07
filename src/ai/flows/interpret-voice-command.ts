@@ -6,16 +6,16 @@
  *
  * - interpretVoiceCommand - A function that handles the voice command interpretation process.
  * - InterpretVoiceCommandInput - The input type for the interpretVoiceCommand function.
- * - InterpretVoiceCommandOutput - The return type for the interpretVoiceCommand function.
+ * - InterpretVoiceCommandOutput - The return type for the interpretVoiceCommandOutput function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {openApplication, getInstalledApplications} from '@/services/application-manager';
-import {searchFiles} from '@/services/file-search';
+import { getInstalledApplications } from '@/services/application-manager';
 
 const InterpretVoiceCommandInputSchema = z.object({
   voiceCommand: z.string().describe('The voice command given by the user.'),
+  installedApplications: z.array(z.string()).optional().describe('A list of installed application names.'),
 });
 export type InterpretVoiceCommandInput = z.infer<typeof InterpretVoiceCommandInputSchema>;
 
@@ -30,14 +30,11 @@ const InterpretVoiceCommandOutputSchema = z.object({
 });
 export type InterpretVoiceCommandOutput = z.infer<typeof InterpretVoiceCommandOutputSchema>;
 
-export async function interpretVoiceCommand(input: InterpretVoiceCommandInput): Promise<InterpretVoiceCommandOutput> {
-  return interpretVoiceCommandFlow(input);
-}
-
-const applicationOptions = async () => {
+export async function interpretVoiceCommand(input: Pick<InterpretVoiceCommandInput, 'voiceCommand'>): Promise<InterpretVoiceCommandOutput> {
   const applications = await getInstalledApplications();
-  return applications.map(app => app.name);
-};
+  const applicationNames = applications.map(app => app.name);
+  return interpretVoiceCommandFlow({ ...input, installedApplications: applicationNames });
+}
 
 const interpretVoiceCommandPrompt = ai.definePrompt({
   name: 'interpretVoiceCommandPrompt',
@@ -54,9 +51,13 @@ Here are the possible actions you can take:
 - unknown: If you cannot determine the action to take, use this action.
 
 Here are the applications that are installed on this computer:
-{{#each (await applicationOptions)}}
+{{#if installedApplications}}
+{{#each installedApplications}}
 - {{this}}
 {{/each}}
+{{else}}
+No applications are listed as installed.
+{{/if}}
 
 Voice Command: {{{voiceCommand}}}`,
 });
@@ -67,8 +68,9 @@ const interpretVoiceCommandFlow = ai.defineFlow(
     inputSchema: InterpretVoiceCommandInputSchema,
     outputSchema: InterpretVoiceCommandOutputSchema,
   },
-  async input => {
+  async (input: InterpretVoiceCommandInput) => {
     const {output} = await interpretVoiceCommandPrompt(input);
     return output!;
   }
 );
+
