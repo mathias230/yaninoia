@@ -17,7 +17,10 @@ const AnswerGeneralQuestionInputSchema = z.object({
     name: z.string().describe('The name of the uploaded file.'),
     type: z.string().describe('The MIME type of the uploaded file.'),
     dataUri: z.string().describe("The content of the uploaded file, as a data URI. Format: 'data:<mimetype>;base64,<encoded_data>'."),
-  }).optional().describe('An optional file provided by the user for analysis, summarization, or to answer questions about.')
+  }).optional().describe('An optional file provided by the user for analysis, summarization, or to answer questions about.'),
+  // Fields for pre-processed file data, to be populated by the flow
+  fileIsText: z.boolean().optional().describe('Internal field: Whether the uploaded file is determined to be a text file.'),
+  fileTextPreview: z.string().optional().describe('Internal field: A preview of the text content (first 2000 chars) if the file is text-based.')
 });
 export type AnswerGeneralQuestionInput = z.infer<typeof AnswerGeneralQuestionInputSchema>;
 
@@ -27,13 +30,16 @@ const AnswerGeneralQuestionOutputSchema = z.object({
 });
 export type AnswerGeneralQuestionOutput = z.infer<typeof AnswerGeneralQuestionOutputSchema>;
 
-export async function answerGeneralQuestion(input: AnswerGeneralQuestionInput): Promise<AnswerGeneralQuestionOutput> {
+// Type for the external input to the exported function, which won't include pre-processed fields.
+export type AnswerGeneralQuestionUserFacingInput = Omit<AnswerGeneralQuestionInput, 'fileIsText' | 'fileTextPreview'>;
+
+export async function answerGeneralQuestion(input: AnswerGeneralQuestionUserFacingInput): Promise<AnswerGeneralQuestionOutput> {
   return answerGeneralQuestionFlow(input);
 }
 
 const answerGeneralQuestionPrompt = ai.definePrompt({
   name: 'answerGeneralQuestionPrompt',
-  input: {schema: AnswerGeneralQuestionInputSchema},
+  input: {schema: AnswerGeneralQuestionInputSchema}, // Prompt expects the schema with pre-processed fields
   output: {schema: AnswerGeneralQuestionOutputSchema},
   prompt: `You are a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions or instructions in a warm and approachable tone. Use conversational language and try to be helpful and understanding.
 
@@ -46,16 +52,16 @@ The user has also provided an image. Analyze this image as part of your response
 
 {{#if fileData}}
 The user has also uploaded a file named "{{fileData.name}}" (type: {{fileData.type}}).
-Please analyze its content and help the user with it. You can assist with understanding, summarizing, or answering questions about this file. If the file is text-based, you can refer to its content directly. If it's another type, describe what you can infer or how you might help given its type and name.
+Please analyze its content and help the user with it. You can assist with understanding, summarizing, or answering questions about this file.
 File Reference: {{fileData.name}} (type: {{fileData.type}})
-{{#ifCond fileData.type "startsWith" "text"}}
+{{#if fileIsText}}
 File Content (first 2000 characters):
 \`\`\`
-{{{substring (dataUriToString fileData.dataUri) 0 2000}}}
+{{{fileTextPreview}}}
 \`\`\`
 {{else}}
 This is a non-text file. You can discuss its potential contents or uses based on its name and type.
-{{/ifCond}}
+{{/if}}
 {{/if}}
 
 Provide your answer in the 'answer' field.
@@ -76,111 +82,49 @@ const dataUriToString = (dataUri: string): string => {
   }
 };
 
-// Custom Handlebars helper for string manipulation (substring)
-// Custom Handlebars helper for conditional logic
-const handlebarsHelpers = {
-  substring: (str: string, start: number, end: number) => {
-    if (typeof str !== 'string') return '';
-    return str.substring(start, end);
-  },
-  dataUriToString: dataUriToString,
-   ifCond: function(v1: any, operator: string, v2: any, options: any) {
-    switch (operator) {
-      case 'startsWith':
-        return (typeof v1 === 'string' && typeof v2 === 'string' && v1.startsWith(v2)) ? options.fn(this) : options.inverse(this);
-      default:
-        return options.inverse(this);
-    }
-  }
-};
-
-
 const answerGeneralQuestionFlow = ai.defineFlow(
   {
     name: 'answerGeneralQuestionFlow',
-    inputSchema: AnswerGeneralQuestionInputSchema,
+    inputSchema: AnswerGeneralQuestionInputSchema, // Flow's internal input type matches prompt's expectation
     outputSchema: AnswerGeneralQuestionOutputSchema,
-    // @ts-ignore - Genkit types might not fully align with custom Handlebars helpers argument passing.
-    // This is a known pattern for extending Handlebars.
-    // We register helpers directly on the prompt object if the library supports it,
-    // or ensure they are available in the Handlebars environment Genkit uses.
-    // For this example, we'll assume Genkit's Handlebars instance can be extended or these are available.
-    // If not, the prompt itself would need to be more complex or rely on pre-processing.
-    // For now, we define them and will use them in the prompt template.
-    // Genkit's internal Handlebars instance needs to have these helpers registered.
-    // This is typically done globally or per-prompt.
-    // Since direct registration isn't shown in basic Genkit examples,
-    // this implies a need for either a Genkit feature or pre-processing the input.
-    // For simplicity, assuming helpers are available or input is pre-processed.
   },
-  async (input: AnswerGeneralQuestionInput) => {
-     // The actual rendering with Handlebars helpers happens within ai.definePrompt
-     // If Genkit doesn't auto-register helpers passed this way,
-     // one would typically preprocess the input object to include derived fields
-     // that the basic Handlebars syntax can then use.
-     // e.g. input.fileData.textContent = dataUriToString(input.fileData.dataUri)
+  async (input: AnswerGeneralQuestionUserFacingInput) => { // Flow receives user-facing input type
+    
+    const promptInput: AnswerGeneralQuestionInput = { ...input };
 
-    // We'll pass the helpers directly to the prompt call if supported,
-    // otherwise, this structure assumes Genkit handles it or they are globally registered.
-    const promptWithHelpers = ai.definePrompt({
-      name: 'answerGeneralQuestionPromptWithHelpers', // Make sure this name is unique or reuse existing
-      input: { schema: AnswerGeneralQuestionInputSchema },
-      output: { schema: AnswerGeneralQuestionOutputSchema },
-      prompt: answerGeneralQuestionPrompt.prompt, // Use the same prompt string
-      // @ts-ignore - Genkit might not have a direct 'helpers' option like this.
-      // This is illustrative. The helpers need to be available to Handlebars.
-      config: {
-        customHelpers: handlebarsHelpers, // This is a conceptual placement
-      },
-    });
+    if (input.fileData) {
+      promptInput.fileIsText = input.fileData.type.startsWith("text");
+      if (promptInput.fileIsText) {
+        const fileContent = dataUriToString(input.fileData.dataUri);
+        promptInput.fileTextPreview = fileContent.substring(0, 2000);
+      }
+    }
 
-
-    // If customHelpers cannot be passed directly, manual pre-processing or global registration is needed.
-    // For this exercise, we will proceed as if the helpers in the prompt template will work as intended.
-    // The 'dataUriToString' and 'substring' helpers will be used by the template.
-
-    const {output} = await answerGeneralQuestionPrompt({...input}); // Using original prompt
+    const {output} = await answerGeneralQuestionPrompt(promptInput); 
     
     if (!output) {
       // Fallback if the LLM fails to produce structured output
-      const fallbackResponse = await ai.generate({
-        prompt: `Answer the following question in a friendly and empathetic tone: ${input.question}`,
-      });
+      // Ensure fallbackResponse.text is not null or undefined before assigning
+      let fallbackAnswer = "Sorry, I couldn't find an answer to that. I'm still learning!";
+      try {
+        const fallbackResponse = await ai.generate({
+          prompt: `Answer the following question in a friendly and empathetic tone: ${input.question}`,
+        });
+        if (fallbackResponse.text) {
+          fallbackAnswer = fallbackResponse.text;
+        }
+      } catch (e) {
+        console.error("Error during fallback generation:", e);
+        // Keep the default fallbackAnswer
+      }
       return {
-        answer: fallbackResponse.text ?? "Sorry, I couldn't find an answer to that. I'm still learning!",
+        answer: fallbackAnswer,
         originalQuestion: input.question,
       };
     }
     return {
       ...output,
-      originalQuestion: output.originalQuestion || input.question,
+      originalQuestion: output.originalQuestion || input.question, // Ensure originalQuestion is always populated
     };
   }
 );
-
-// Attempt to register helpers globally if Genkit supports it this way (this is speculative)
-// or by passing to prompt. This part is highly dependent on Genkit's specific API for Handlebars customization.
-// For now, the prompt string itself uses these helpers.
-// If there's an error like "unknown helper", this indicates helpers aren't registered.
-// Genkit may require specific plugin points for Handlebars helper registration.
-// The provided Genkit guidelines don't explicitly cover custom Handlebars helper registration.
-// In a real scenario, consult Genkit documentation for the correct way to add custom helpers.
-// For this exercise, the prompt is written assuming the helpers are available.
-
-if (typeof Handlebars !== 'undefined') {
-    // @ts-ignore
-    Handlebars.registerHelper('substring', handlebarsHelpers.substring);
-    // @ts-ignore
-    Handlebars.registerHelper('dataUriToString', handlebarsHelpers.dataUriToString);
-    // @ts-ignore
-    Handlebars.registerHelper('ifCond', handlebarsHelpers.ifCond);
-} else if (ai.registry && ai.registry.engine && ai.registry.engine.handlebars) {
-    // @ts-ignore - Speculative: Accessing internal Handlebars instance
-    ai.registry.engine.handlebars.registerHelper('substring', handlebarsHelpers.substring);
-    // @ts-ignore
-    ai.registry.engine.handlebars.registerHelper('dataUriToString', handlebarsHelpers.dataUriToString);
-    // @ts-ignore
-    ai.registry.engine.handlebars.registerHelper('ifCond', handlebarsHelpers.ifCond);
-}
-
-
