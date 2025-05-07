@@ -4,9 +4,9 @@
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bot, Loader2, User } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import Image from "next/image";
+import { Bot, Loader2, User, FileText, Image as ImageIcon } from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import NextImage from "next/image"; // Renamed to avoid conflict
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -14,6 +14,9 @@ interface ChatMessageBubbleProps {
 
 export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
   const isUser = message.sender === "user";
+  const hasImage = !!message.image || (message.file && message.file.type.startsWith("image/"));
+  const imageData = message.image || (message.file && message.file.type.startsWith("image/") ? message.file.dataUri : undefined);
+  const hasGenericFile = message.file && !message.file.type.startsWith("image/");
 
   return (
     <div
@@ -23,9 +26,9 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       )}
     >
       {!isUser && (
-        <Avatar className="h-8 w-8 bg-accent text-accent-foreground">
+        <Avatar className="h-8 w-8 bg-accent text-accent-foreground flex-shrink-0">
           <AvatarImage asChild src="https://picsum.photos/32/32?random=1" data-ai-hint="robot ai">
-            <Image src="https://picsum.photos/32/32?random=1" alt="AI Avatar" width={32} height={32} />
+            <NextImage src="https://picsum.photos/32/32?random=1" alt="AI Avatar" width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <Bot size={18} />
@@ -47,14 +50,45 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               <span>Thinking...</span>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
+            <>
+              {imageData && (
+                <div className="mb-2 rounded-md overflow-hidden max-h-80">
+                  <NextImage 
+                    src={imageData} 
+                    alt={message.file?.name || "User uploaded image"} 
+                    width={300} 
+                    height={200} 
+                    className="object-contain w-full h-auto max-h-80" 
+                    unoptimized={imageData.startsWith('data:image')} // Important for data URIs
+                    data-ai-hint="attached image"
+                  />
+                </div>
+              )}
+              {hasGenericFile && message.file && (
+                <div className="mb-2 p-2 border rounded-md flex items-center gap-2 bg-background/10 dark:bg-foreground/10">
+                  <FileText className="h-6 w-6 text-current/70 flex-shrink-0" />
+                  <span className="text-sm truncate" title={message.file.name}>{message.file.name}</span>
+                </div>
+              )}
+              {message.content && (
+                 <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
+              )}
+              {/* If only attachment and no text, show a generic message or icon */}
+              {!message.content && (imageData || hasGenericFile) && isUser && (
+                <p className="whitespace-pre-wrap text-sm sm:text-base italic opacity-80">
+                  {imageData && <ImageIcon size={14} className="inline mr-1"/>}
+                  {hasGenericFile && <FileText size={14} className="inline mr-1"/>}
+                  Sent attachment
+                </p>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
       {isUser && (
-        <Avatar className="h-8 w-8 bg-secondary text-secondary-foreground">
+        <Avatar className="h-8 w-8 bg-secondary text-secondary-foreground flex-shrink-0">
            <AvatarImage asChild src="https://picsum.photos/32/32?random=2" data-ai-hint="person user">
-            <Image src="https://picsum.photos/32/32?random=2" alt="User Avatar" width={32} height={32} />
+            <NextImage src="https://picsum.photos/32/32?random=2" alt="User Avatar" width={32} height={32} />
           </AvatarImage>
           <AvatarFallback>
             <User size={18} />

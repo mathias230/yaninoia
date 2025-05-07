@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ChatMessage, ChatSession } from "@/types/chat";
 import { getFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
-import { answerGeneralQuestion } from "@/ai/flows/answer-general-question";
+import { answerGeneralQuestion, AnswerGeneralQuestionInput } from "@/ai/flows/answer-general-question";
 
 import { ChatHistorySidebar } from "@/components/chat/ChatHistorySidebar";
 import { ConversationView } from "@/components/chat/ConversationView";
@@ -24,18 +24,16 @@ export default function ChatPage() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { toast } = useToast();
 
-  // Load sessions from localStorage on initial mount
   useEffect(() => {
     const storedSessions = getFromLocalStorage<ChatSession[]>(CHAT_SESSIONS_KEY, []);
     setChatSessions(storedSessions);
     if (storedSessions.length > 0) {
-      setActiveChatSessionId(storedSessions[0].id); // Activate the most recent chat by default
+      setActiveChatSessionId(storedSessions[0].id);
     } else {
-      handleCreateNewChat(); // Create a new chat if none exist
+      handleCreateNewChat();
     }
   }, []);
 
-  // Save sessions to localStorage whenever they change
   useEffect(() => {
     saveToLocalStorage(CHAT_SESSIONS_KEY, chatSessions);
   }, [chatSessions]);
@@ -49,24 +47,25 @@ export default function ChatPage() {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    setChatSessions((prevSessions) => [newChatSession, ...prevSessions]); // Add to the beginning
+    setChatSessions((prevSessions) => [newChatSession, ...prevSessions]);
     setActiveChatSessionId(newChatId);
-    setIsMobileSidebarOpen(false); // Close sidebar on mobile after creating new chat
+    setIsMobileSidebarOpen(false);
     return newChatId;
   }, []);
 
   const handleSelectChat = useCallback((sessionId: string) => {
     setActiveChatSessionId(sessionId);
-    setIsMobileSidebarOpen(false); // Close sidebar on mobile after selecting a chat
+    setIsMobileSidebarOpen(false);
   }, []);
   
   const handleDeleteChat = useCallback((sessionId: string) => {
     setChatSessions(prevSessions => {
       const updatedSessions = prevSessions.filter(session => session.id !== sessionId);
       if (activeChatSessionId === sessionId) {
-        setActiveChatSessionId(updatedSessions.length > 0 ? updatedSessions[0].id : null);
-        if (updatedSessions.length === 0) {
-           handleCreateNewChat(); // Create a new one if all are deleted
+        const newActiveId = updatedSessions.length > 0 ? updatedSessions[0].id : null;
+        setActiveChatSessionId(newActiveId);
+        if (!newActiveId) {
+           handleCreateNewChat(); 
         }
       }
       return updatedSessions;
@@ -78,18 +77,20 @@ export default function ChatPage() {
   }, [activeChatSessionId, toast, handleCreateNewChat]);
 
 
-  const handleSendMessage = async (messageContent: string) => {
-    if (!activeChatSessionId) {
-      // If no active chat, create one (should ideally not happen if UI is right)
-      const newId = handleCreateNewChat();
-      if (!newId) return; // Should not happen
-       // Need to ensure state updates before proceeding, or pass newId
-       // For simplicity, let's assume handleCreateNewChat sets activeChatSessionId synchronously enough
-       // or we call handleSendMessage again after creation.
-       // A better way might be to make handleCreateNewChat return the new session and use that.
-       // For now, let's rely on it being set before the next AI call.
-       // This edge case handling might need refinement.
+  const handleSendMessage = async (
+    messageContent: string,
+    attachments?: {
+      image?: string; // data URI
+      file?: { name: string; type: string; dataUri: string };
     }
+  ) => {
+    let currentChatId = activeChatSessionId;
+    if (!currentChatId) {
+      currentChatId = handleCreateNewChat();
+      // Need to ensure state updates if we want to use activeChatSessionId immediately.
+      // For robustness, use the returned ID from handleCreateNewChat.
+    }
+    if (!currentChatId) return; // Should not happen
 
 
     const userMessage: ChatMessage = {
@@ -97,13 +98,26 @@ export default function ChatPage() {
       sender: "user",
       content: messageContent,
       timestamp: new Date(),
+      image: attachments?.image,
+      file: attachments?.file,
     };
 
-    // Add user message and a temporary AI loading message
     setChatSessions((prevSessions) =>
       prevSessions.map((session) => {
-        if (session.id === activeChatSessionId) {
-          const newTitle = session.messages.length === 0 ? messageContent.substring(0, 50) : session.title;
+        if (session.id === currentChatId) {
+          // Set title from first text message, or based on attachment type if no text
+          let newTitle = session.title;
+          if (session.messages.length === 0) {
+            if (messageContent) {
+              newTitle = messageContent.substring(0, 30) + (messageContent.length > 30 ? "..." : "");
+            } else if (attachments?.image) {
+              newTitle = "Image analysis";
+            } else if (attachments?.file) {
+              newTitle = `File: ${attachments.file.name.substring(0,20)}...`;
+            } else {
+              newTitle = "New Chat";
+            }
+          }
           return {
             ...session,
             title: newTitle,
@@ -115,30 +129,38 @@ export default function ChatPage() {
       })
     );
     
-    // Prepare for AI response
     setIsLoadingAiResponse(true);
     const aiLoadingMessageId = crypto.randomUUID();
     const aiLoadingMessage: ChatMessage = {
       id: aiLoadingMessageId,
       sender: "ai",
-      content: "", // Placeholder, will be updated
+      content: "", 
       timestamp: new Date(),
       isLoading: true,
     };
 
     setChatSessions((prevSessions) =>
       prevSessions.map((session) =>
-        session.id === activeChatSessionId
+        session.id === currentChatId
           ? { ...session, messages: [...session.messages, aiLoadingMessage] }
           : session
       )
     );
 
-
     try {
-      const aiResponse = await answerGeneralQuestion({ question: messageContent });
+      const aiInput: AnswerGeneralQuestionInput = {
+        question: messageContent,
+      };
+      if (attachments?.image) {
+        aiInput.imageDataUri = attachments.image;
+      }
+      if (attachments?.file) {
+        aiInput.fileData = attachments.file;
+      }
+
+      const aiResponse = await answerGeneralQuestion(aiInput);
       const aiMessage: ChatMessage = {
-        id: aiLoadingMessageId, // Use the same ID to replace the loading message
+        id: aiLoadingMessageId,
         sender: "ai",
         content: aiResponse.answer,
         timestamp: new Date(),
@@ -147,7 +169,7 @@ export default function ChatPage() {
 
       setChatSessions((prevSessions) =>
         prevSessions.map((session) => {
-          if (session.id === activeChatSessionId) {
+          if (session.id === currentChatId) {
             return {
               ...session,
               messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiMessage : msg),
@@ -161,7 +183,7 @@ export default function ChatPage() {
       console.error("Error getting AI response:", error);
       const errorMessage = error instanceof Error ? error.message : "Sorry, something went wrong.";
       const aiErrorMessage: ChatMessage = {
-        id: aiLoadingMessageId, // Replace loading message with error
+        id: aiLoadingMessageId,
         sender: "ai",
         content: `Error: ${errorMessage}`,
         timestamp: new Date(),
@@ -169,7 +191,7 @@ export default function ChatPage() {
       };
        setChatSessions((prevSessions) =>
         prevSessions.map((session) => {
-          if (session.id === activeChatSessionId) {
+          if (session.id === currentChatId) {
             return {
               ...session,
               messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiErrorMessage : msg),
@@ -193,7 +215,6 @@ export default function ChatPage() {
 
   return (
     <main className="flex h-screen bg-background text-foreground overflow-hidden">
-      {/* Mobile Sidebar Trigger */}
       <div className="sm:hidden fixed top-4 left-4 z-50">
         <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
           <SheetTrigger asChild>
@@ -214,7 +235,6 @@ export default function ChatPage() {
         </Sheet>
       </div>
 
-      {/* Desktop Sidebar */}
       <div className="hidden sm:flex h-full">
          <ChatHistorySidebar
             sessions={chatSessions}
@@ -234,7 +254,7 @@ export default function ChatPage() {
         </header>
         <ConversationView
           messages={activeChat?.messages || []}
-          isLoading={!activeChat && chatSessions.length > 0} // Show loading if active chat is being determined
+          isLoading={!activeChat && chatSessions.length > 0}
         />
         <ChatInput
           onSendMessage={handleSendMessage}
