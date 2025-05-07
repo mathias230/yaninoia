@@ -50,7 +50,7 @@ export function ChatHistorySidebar({
         ) : (
           <nav className="p-2 space-y-1">
             {sessions.map((session) => (
-              <button
+              <div // Changed from button to div to prevent nesting buttons
                 key={session.id}
                 role="button"
                 tabIndex={0}
@@ -63,7 +63,7 @@ export function ChatHistorySidebar({
                 }}
                 className={cn(
                   buttonVariants({ variant: "ghost", size: "default" }),
-                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative text-left",
+                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative text-left cursor-pointer", // Added cursor-pointer
                    session.id === activeSessionId && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90"
                 )}
                 onClick={() => onSelectChat(session.id)}
@@ -95,7 +95,7 @@ export function ChatHistorySidebar({
                 >
                   <Trash2 size={16} />
                 </Button>
-              </button>
+              </div>
             ))}
           </nav>
         )}
@@ -103,3 +103,4 @@ export function ChatHistorySidebar({
     </div>
   );
 }
+
