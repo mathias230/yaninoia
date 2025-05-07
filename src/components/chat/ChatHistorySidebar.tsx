@@ -15,6 +15,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import React from "react";
 
 
 interface ChatHistorySidebarProps {
@@ -39,9 +51,7 @@ export function ChatHistorySidebar({
 
   const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); 
-    if (window.confirm("¿Estás seguro de que quieres eliminar esta sesión de chat?")) {
-      onDeleteChat(sessionId);
-    }
+    // Confirmation is handled by AlertDialog, direct call to onDeleteChat happens in AlertDialogAction
   };
 
   const handleTogglePinClick = (e: React.MouseEvent, sessionId: string) => {
@@ -132,10 +142,38 @@ export function ChatHistorySidebar({
                       <Edit3 className="mr-2 h-4 w-4" />
                       <span>Renombrar</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onClick={(e) => handleDeleteClick(e, session.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      <span>Eliminar</span>
-                    </DropdownMenuItem>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <DropdownMenuItem 
+                          className="text-destructive focus:text-destructive-foreground focus:bg-destructive" 
+                          onSelect={(e) => e.preventDefault()} // Prevent DropdownMenu from closing
+                          onClick={(e) => handleDeleteClick(e, session.id)} // Keep for potential direct actions if needed
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Eliminar</span>
+                        </DropdownMenuItem>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta acción no se puede deshacer. Esto eliminará permanentemente la sesión de chat: "{session.title}".
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteChat(session.id);
+                            }}
+                            className={buttonVariants({variant: "destructive"})}
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
