@@ -10,6 +10,7 @@ export interface ChatMessage {
     type: string;
     dataUri: string; // Data URI for the file content
   };
+  extractedCodeBlocks?: Array<{ language: string; code: string }>; // For code snippets
 }
 
 export interface ChatSession {

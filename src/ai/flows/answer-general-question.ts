@@ -66,6 +66,14 @@ const answerGeneralQuestionPrompt = ai.definePrompt({
   output: {schema: AnswerGeneralQuestionOutputSchema},
   prompt: `You are a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions or instructions. Use the provided conversation history to maintain context and provide relevant follow-up responses. Use a warm and approachable tone with conversational language.
 
+When providing code snippets, please enclose them in markdown code blocks with the language specified, for example:
+\`\`\`html
+<p>Hello</p>
+\`\`\`
+\`\`\`javascript
+console.log('world');
+\`\`\`
+
 {{#if conversationHistory}}
 --- Conversation History (Oldest to Newest) ---
 {{#each conversationHistory}}
@@ -107,8 +115,12 @@ Also, return the original current question in the 'originalQuestion' field, whic
 const dataUriToString = (dataUri: string): string => {
   try {
     const base64Part = dataUri.substring(dataUri.indexOf(',') + 1);
-    const decoded = Buffer.from(base64Part, 'base64').toString('utf-8');
-    return decoded;
+    // Node.js Buffer for server-side
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(base64Part, 'base64').toString('utf-8');
+    }
+    // Basic browser-side decoding (less robust for all charsets)
+    return atob(base64Part);
   } catch (e) {
     console.warn("Failed to decode data URI to string", e);
     return "[Could not decode file content]";
@@ -144,8 +156,6 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     if (!output) {
       let fallbackAnswer = "Sorry, I couldn't find an answer to that. I'm still learning!";
       try {
-        // Fallback prompt should also ideally have history if we want it to be contextual
-        // For simplicity, this fallback is non-contextual for now.
         const fallbackResponse = await ai.generate({
           prompt: `Answer the following question in a friendly and empathetic tone: ${userInput.question}`,
         });
@@ -166,4 +176,3 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     };
   }
 );
-

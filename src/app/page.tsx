@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import type { ChatMessage, ChatSession } from "@/types/chat";
 import { getFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
 import { answerGeneralQuestion, AnswerGeneralQuestionUserFacingInput } from "@/ai/flows/answer-general-question";
+import { extractAllCodeBlocks } from "@/lib/utils";
 
 import { ChatHistorySidebar } from "@/components/chat/ChatHistorySidebar";
 import { ConversationView } from "@/components/chat/ConversationView";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { PanelLeft, Settings, LogOut, Mic, HelpCircle, Edit3, Pin, PinOff } from "lucide-react";
+import { PanelLeft, Settings, LogOut, Mic, HelpCircle, Edit3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -23,7 +24,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NextImage from 'next/image';
 import { Input } from "@/components/ui/input"; // For rename input
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // For rename dialog
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"; // For rename dialog
 
 
 const CHAT_SESSIONS_KEY = "chatSessionsOmniAssist"; 
@@ -134,7 +135,6 @@ export default function ChatPage() {
     if (!editingSessionId || !renameInput.trim()) {
       toast({ title: "Invalid Title", description: "Chat title cannot be empty.", variant: "destructive" });
       if(!renameInput.trim() && editingSessionId){
-        // If title is empty, revert to original or a default title before closing dialog
         const originalSession = chatSessions.find(s => s.id === editingSessionId);
         if(originalSession) setRenameInput(originalSession.title);
       }
@@ -185,16 +185,11 @@ export default function ChatPage() {
       file: attachments?.file,
     };
 
-    // Prepare conversation history for the AI
-    // We only send text content for history to keep it concise
-    // And filter out any loading messages.
-    // Also ensure the history is from the correct session.
     const currentChatMessages = chatSessions[currentSessionIndex]?.messages || [];
     const conversationHistoryForAI = currentChatMessages
-      .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) // Keep messages with any content
+      .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) 
       .map(msg => ({
         sender: msg.sender,
-        // For history, only send text content. If it was an image/file without text, indicate that.
         content: msg.content || (msg.image ? "[User sent an image]" : msg.file ? `[User sent a file: ${msg.file.name}]` : "[Empty message]")
       }));
 
@@ -248,7 +243,7 @@ export default function ChatPage() {
     try {
       const aiInput: AnswerGeneralQuestionUserFacingInput = { 
         question: messageContent,
-        conversationHistory: conversationHistoryForAI, // Pass the prepared history
+        conversationHistory: conversationHistoryForAI,
       };
       if (attachments?.image) {
         aiInput.imageDataUri = attachments.image;
@@ -258,12 +253,15 @@ export default function ChatPage() {
       }
 
       const aiResponse = await answerGeneralQuestion(aiInput);
+      const extractedCodeBlocks = extractAllCodeBlocks(aiResponse.answer);
+
       const aiMessage: ChatMessage = {
         id: aiLoadingMessageId, 
         sender: "ai",
         content: aiResponse.answer,
         timestamp: new Date(),
         isLoading: false,
+        extractedCodeBlocks: extractedCodeBlocks.length > 0 ? extractedCodeBlocks : undefined,
       };
 
       setChatSessions((prevSessions) =>
@@ -331,7 +329,6 @@ export default function ChatPage() {
               onDeleteChat={handleDeleteChat}
               onTogglePinChat={handleTogglePinChat}
               onRenameChat={startRenameChat}
-              editingSessionId={editingSessionId}
             />
           </SheetContent>
         </Sheet>
@@ -346,7 +343,6 @@ export default function ChatPage() {
             onDeleteChat={handleDeleteChat}
             onTogglePinChat={handleTogglePinChat}
             onRenameChat={startRenameChat}
-            editingSessionId={editingSessionId}
           />
       </div>
       
@@ -437,4 +433,3 @@ export default function ChatPage() {
     </main>
   );
 }
-
