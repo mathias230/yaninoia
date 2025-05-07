@@ -1,4 +1,3 @@
-
 export interface ChatMessage {
   id: string;
   sender: "user" | "ai";
@@ -19,4 +18,6 @@ export interface ChatSession {
   messages: ChatMessage[];
   createdAt: Date;
   updatedAt: Date;
+  isPinned?: boolean; 
 }
+

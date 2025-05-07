@@ -1,13 +1,18 @@
-
 "use client";
 
 import type { ChatSession } from "@/types/chat";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PlusCircle, MessageSquare, Trash2 } from "lucide-react";
+import { PlusCircle, MessageSquare, Trash2, Pin, PinOff, Edit3, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 interface ChatHistorySidebarProps {
@@ -16,6 +21,9 @@ interface ChatHistorySidebarProps {
   onSelectChat: (sessionId: string) => void;
   onCreateNewChat: () => void;
   onDeleteChat: (sessionId: string) => void;
+  onTogglePinChat: (sessionId: string) => void;
+  onRenameChat: (sessionId: string, currentTitle: string) => void;
+  editingSessionId: string | null; // To manage rename dialog visibility
 }
 
 export function ChatHistorySidebar({
@@ -24,14 +32,28 @@ export function ChatHistorySidebar({
   onSelectChat,
   onCreateNewChat,
   onDeleteChat,
+  onTogglePinChat,
+  onRenameChat,
+  editingSessionId,
 }: ChatHistorySidebarProps) {
 
   const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation(); // Prevent chat selection when clicking delete
+    e.stopPropagation(); 
     if (window.confirm("Are you sure you want to delete this chat session?")) {
       onDeleteChat(sessionId);
     }
   };
+
+  const handleTogglePinClick = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    onTogglePinChat(sessionId);
+  };
+
+  const handleRenameClick = (e: React.MouseEvent, sessionId: string, currentTitle: string) => {
+    e.stopPropagation();
+    onRenameChat(sessionId, currentTitle);
+  };
+
 
   return (
     <div className="w-full h-full sm:w-72 bg-sidebar text-sidebar-foreground border-r flex flex-col shadow-lg">
@@ -50,7 +72,7 @@ export function ChatHistorySidebar({
         ) : (
           <nav className="p-2 space-y-1">
             {sessions.map((session) => (
-              <div // Changed from button to div to prevent nesting buttons
+              <div
                 key={session.id}
                 role="button"
                 tabIndex={0}
@@ -63,12 +85,14 @@ export function ChatHistorySidebar({
                 }}
                 className={cn(
                   buttonVariants({ variant: "ghost", size: "default" }),
-                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative text-left cursor-pointer", // Added cursor-pointer
+                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative text-left cursor-pointer",
                    session.id === activeSessionId && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90"
                 )}
                 onClick={() => onSelectChat(session.id)}
               >
-                <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
+                {session.isPinned && <Pin className="mr-2 h-4 w-4 flex-shrink-0 text-primary" />}
+                {!session.isPinned && <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />}
+                
                 <div className="flex-1 truncate mr-2">
                   <p className={cn(
                       "truncate", 
@@ -86,15 +110,34 @@ export function ChatHistorySidebar({
                     {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true })}
                   </p>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => handleDeleteClick(e, session.id)}
-                  aria-label="Delete chat"
-                >
-                  <Trash2 size={16} />
-                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity flex-shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => e.stopPropagation()} // Prevent chat selection
+                      aria-label="More options"
+                    >
+                      <MoreVertical size={16} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="right" align="start" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => handleTogglePinClick(e, session.id)}>
+                      {session.isPinned ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
+                      <span>{session.isPinned ? "Unpin" : "Pin"}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleRenameClick(e, session.id, session.title)}>
+                      <Edit3 className="mr-2 h-4 w-4" />
+                      <span>Rename</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onClick={(e) => handleDeleteClick(e, session.id)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      <span>Delete</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             ))}
           </nav>
@@ -103,4 +146,3 @@ export function ChatHistorySidebar({
     </div>
   );
 }
-

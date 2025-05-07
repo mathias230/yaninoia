@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -11,7 +10,7 @@ import { ConversationView } from "@/components/chat/ConversationView";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { PanelLeft, Settings, LogOut, Mic, HelpCircle } from "lucide-react";
+import { PanelLeft, Settings, LogOut, Mic, HelpCircle, Edit3, Pin, PinOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -23,27 +22,38 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import NextImage from 'next/image';
+import { Input } from "@/components/ui/input"; // For rename input
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // For rename dialog
 
 
-const CHAT_SESSIONS_KEY = "chatSessionsOmniAssist"; // Unique key for this app
+const CHAT_SESSIONS_KEY = "chatSessionsOmniAssist"; 
 
 export default function ChatPage() {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
   const [isLoadingAiResponse, setIsLoadingAiResponse] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [renameInput, setRenameInput] = useState("");
+
   const { toast } = useToast();
 
   useEffect(() => {
     const storedSessions = getFromLocalStorage<ChatSession[]>(CHAT_SESSIONS_KEY, []);
-    setChatSessions(storedSessions);
+    setChatSessions(storedSessions.sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      }));
     if (storedSessions.length > 0) {
-      const latestSession = storedSessions.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+      const latestSession = storedSessions.sort((a,b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      })[0];
       setActiveChatSessionId(latestSession.id);
     } else {
       handleCreateNewChat();
     }
-  }, []); // Added handleCreateNewChat to dependencies
+  }, []); 
 
   useEffect(() => {
     saveToLocalStorage(CHAT_SESSIONS_KEY, chatSessions);
@@ -59,7 +69,10 @@ export default function ChatPage() {
       updatedAt: new Date(),
       isPinned: false,
     };
-    setChatSessions((prevSessions) => [newChatSession, ...prevSessions]);
+    setChatSessions((prevSessions) => [newChatSession, ...prevSessions].sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    }));
     setActiveChatSessionId(newChatId);
     setIsMobileSidebarOpen(false);
     return newChatId;
@@ -74,9 +87,11 @@ export default function ChatPage() {
     setChatSessions(prevSessions => {
       const updatedSessions = prevSessions.filter(session => session.id !== sessionId);
       if (activeChatSessionId === sessionId) {
-        // Try to select the next available session or create a new one
         const newActiveId = updatedSessions.length > 0 
-          ? updatedSessions.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0].id 
+          ? updatedSessions.sort((a,b) => {
+              if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+              return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+            })[0].id 
           : null;
         setActiveChatSessionId(newActiveId);
         if (!newActiveId) {
@@ -101,35 +116,62 @@ export default function ChatPage() {
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       })
     );
-  }, []);
+     const session = chatSessions.find(s => s.id === sessionId);
+     if (session) {
+      toast({
+        title: session.isPinned ? "Chat Unpinned" : "Chat Pinned",
+        description: `Conversation "${session.title}" ${session.isPinned ? 'unpinned.' : 'pinned.'}`
+      });
+    }
+  }, [chatSessions, toast]);
 
-  const handleRenameChat = useCallback((sessionId: string, newTitle: string) => {
-    if (!newTitle.trim()) {
+  const startRenameChat = (sessionId: string, currentTitle: string) => {
+    setEditingSessionId(sessionId);
+    setRenameInput(currentTitle);
+  };
+
+  const confirmRenameChat = () => {
+    if (!editingSessionId || !renameInput.trim()) {
       toast({ title: "Invalid Title", description: "Chat title cannot be empty.", variant: "destructive" });
+      if(!renameInput.trim() && editingSessionId){
+        // If title is empty, revert to original or a default title before closing dialog
+        const originalSession = chatSessions.find(s => s.id === editingSessionId);
+        if(originalSession) setRenameInput(originalSession.title);
+      }
       return;
     }
     setChatSessions(prevSessions => 
       prevSessions.map(session => 
-        session.id === sessionId ? { ...session, title: newTitle, updatedAt: new Date() } : session
-      )
+        session.id === editingSessionId ? { ...session, title: renameInput.trim(), updatedAt: new Date() } : session
+      ).sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      })
     );
-    toast({ title: "Chat Renamed", description: `Conversation updated to "${newTitle}".`});
-  }, [toast]);
+    toast({ title: "Chat Renamed", description: `Conversation updated to "${renameInput.trim()}".`});
+    setEditingSessionId(null);
+    setRenameInput("");
+  };
+
+  const cancelRenameChat = () => {
+    setEditingSessionId(null);
+    setRenameInput("");
+  };
 
 
   const handleSendMessage = async (
     messageContent: string,
     attachments?: {
-      image?: string; // data URI
+      image?: string; 
       file?: { name: string; type: string; dataUri: string };
     }
   ) => {
     let currentChatId = activeChatSessionId;
-    if (!currentChatId && chatSessions.length === 0) { // Only create new if no active AND no sessions
-      currentChatId = handleCreateNewChat();
-    } else if (!currentChatId && chatSessions.length > 0) { // If no active but sessions exist, pick latest
-      currentChatId = chatSessions.sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0].id;
-      setActiveChatSessionId(currentChatId); // Set it as active
+    let currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId);
+
+    if (currentChatId === null || currentSessionIndex === -1) {
+        currentChatId = handleCreateNewChat();
+        currentSessionIndex = 0; // New chat is at the top
     }
     
     if (!currentChatId) return; 
@@ -143,12 +185,26 @@ export default function ChatPage() {
       file: attachments?.file,
     };
 
+    // Prepare conversation history for the AI
+    // We only send text content for history to keep it concise
+    // And filter out any loading messages.
+    // Also ensure the history is from the correct session.
+    const currentChatMessages = chatSessions[currentSessionIndex]?.messages || [];
+    const conversationHistoryForAI = currentChatMessages
+      .filter(msg => !msg.isLoading && (msg.content || msg.image || msg.file)) // Keep messages with any content
+      .map(msg => ({
+        sender: msg.sender,
+        // For history, only send text content. If it was an image/file without text, indicate that.
+        content: msg.content || (msg.image ? "[User sent an image]" : msg.file ? `[User sent a file: ${msg.file.name}]` : "[Empty message]")
+      }));
+
+
     setChatSessions((prevSessions) =>
       prevSessions.map((session) => {
         if (session.id === currentChatId) {
           let newTitle = session.title;
           const isDefaultTitle = session.title === "New Conversation" || session.messages.length === 0;
-          if (isDefaultTitle) { // Only set title automatically if it's new or untitled
+          if (isDefaultTitle && session.messages.filter(m => !m.isLoading).length === 0) { 
             if (messageContent) {
               newTitle = messageContent.substring(0, 35) + (messageContent.length > 35 ? "..." : "");
             } else if (attachments?.image) {
@@ -165,7 +221,7 @@ export default function ChatPage() {
           };
         }
         return session;
-      }).sort((a, b) => { // Re-sort after message to bring updated chat to top (if not pinned)
+      }).sort((a, b) => { 
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
         return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       })
@@ -181,7 +237,6 @@ export default function ChatPage() {
       isLoading: true,
     };
 
-    // Add loading message to the correct session
     setChatSessions((prevSessions) =>
       prevSessions.map((session) =>
         session.id === currentChatId
@@ -191,8 +246,9 @@ export default function ChatPage() {
     );
 
     try {
-      const aiInput: AnswerGeneralQuestionUserFacingInput = { // Use the user-facing input type
+      const aiInput: AnswerGeneralQuestionUserFacingInput = { 
         question: messageContent,
+        conversationHistory: conversationHistoryForAI, // Pass the prepared history
       };
       if (attachments?.image) {
         aiInput.imageDataUri = attachments.image;
@@ -203,7 +259,7 @@ export default function ChatPage() {
 
       const aiResponse = await answerGeneralQuestion(aiInput);
       const aiMessage: ChatMessage = {
-        id: aiLoadingMessageId, // Use the same ID to replace the loading message
+        id: aiLoadingMessageId, 
         sender: "ai",
         content: aiResponse.answer,
         timestamp: new Date(),
@@ -215,7 +271,7 @@ export default function ChatPage() {
           if (session.id === currentChatId) {
             return {
               ...session,
-              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiMessage : msg), // Replace loading with actual
+              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiMessage : msg), 
               updatedAt: new Date(),
             };
           }
@@ -226,7 +282,7 @@ export default function ChatPage() {
       console.error("Error getting AI response:", error);
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred.";
       const aiErrorMessage: ChatMessage = {
-        id: aiLoadingMessageId, // Use same ID
+        id: aiLoadingMessageId, 
         sender: "ai",
         content: `Error: ${errorMessage}`,
         timestamp: new Date(),
@@ -237,7 +293,7 @@ export default function ChatPage() {
           if (session.id === currentChatId) {
             return {
               ...session,
-              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiErrorMessage : msg), // Replace loading
+              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiErrorMessage : msg), 
               updatedAt: new Date(),
             };
           }
@@ -257,8 +313,7 @@ export default function ChatPage() {
   const activeChat = chatSessions.find(session => session.id === activeChatSessionId);
 
   return (
-    <div className="flex h-screen antialiased text-foreground bg-background overflow-hidden">
-      {/* Mobile Sidebar Trigger */}
+    <main className="flex h-screen antialiased text-foreground bg-background overflow-hidden">
       <div className="sm:hidden fixed top-3 left-3 z-50">
         <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
           <SheetTrigger asChild>
@@ -275,13 +330,13 @@ export default function ChatPage() {
               onCreateNewChat={handleCreateNewChat}
               onDeleteChat={handleDeleteChat}
               onTogglePinChat={handleTogglePinChat}
-              onRenameChat={handleRenameChat}
+              onRenameChat={startRenameChat}
+              editingSessionId={editingSessionId}
             />
           </SheetContent>
         </Sheet>
       </div>
 
-      {/* Desktop Sidebar */}
       <div className="hidden sm:flex h-full">
          <ChatHistorySidebar
             sessions={chatSessions}
@@ -290,21 +345,19 @@ export default function ChatPage() {
             onCreateNewChat={handleCreateNewChat}
             onDeleteChat={handleDeleteChat}
             onTogglePinChat={handleTogglePinChat}
-            onRenameChat={handleRenameChat}
+            onRenameChat={startRenameChat}
+            editingSessionId={editingSessionId}
           />
       </div>
       
-
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-         {/* Header for main content area */}
         <header className="p-3 border-b bg-card/80 backdrop-blur-sm flex items-center justify-between print:hidden">
-          <div className="sm:hidden flex-1"> {/* Placeholder for mobile layout balance or title */}
+          <div className="sm:hidden flex-1"> 
              <h1 className="text-lg font-semibold truncate text-center">
               {activeChat?.title || "OmniAssist"}
             </h1>
           </div>
-          <div className="hidden sm:flex flex-1 items-center"> {/* Desktop title */}
+          <div className="hidden sm:flex flex-1 items-center"> 
              <h1 className="text-xl font-semibold text-primary pl-3">
               {activeChat?.title || "OmniAssist"}
             </h1>
@@ -318,8 +371,8 @@ export default function ChatPage() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage asChild src="https://picsum.photos/seed/user1/40/40" data-ai-hint="female user">
-                       <NextImage src="https://picsum.photos/seed/user1/40/40" alt="User Avatar" width={40} height={40} />
+                    <AvatarImage asChild src="https://picsum.photos/seed/userProfile/40/40" data-ai-hint="female user">
+                       <NextImage src="https://picsum.photos/seed/userProfile/40/40" alt="User Avatar" width={40} height={40} />
                     </AvatarImage>
                     <AvatarFallback>U</AvatarFallback>
                   </Avatar>
@@ -348,15 +401,40 @@ export default function ChatPage() {
 
         <ConversationView
           messages={activeChat?.messages || []}
-          isLoading={!activeChat && chatSessions.length > 0} // Show loading if fetching initial active chat
-          chatTitle={activeChat?.title || "Conversation"}
+          isLoading={!activeChat && chatSessions.length > 0}
         />
         <ChatInput
           onSendMessage={handleSendMessage}
           isLoading={isLoadingAiResponse}
         />
       </div>
-    </div>
+
+      {editingSessionId && (
+        <Dialog open={!!editingSessionId} onOpenChange={(isOpen) => !isOpen && cancelRenameChat()}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename Chat</DialogTitle>
+              <DialogDescription>
+                Enter a new title for this conversation.
+              </DialogDescription>
+            </DialogHeader>
+            <Input 
+              value={renameInput} 
+              onChange={(e) => setRenameInput(e.target.value)} 
+              placeholder="Enter new chat title"
+              onKeyDown={(e) => e.key === 'Enter' && confirmRenameChat()}
+              className="my-4"
+            />
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline" onClick={cancelRenameChat}>Cancel</Button>
+              </DialogClose>
+              <Button onClick={confirmRenameChat}>Save</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </main>
   );
 }
 

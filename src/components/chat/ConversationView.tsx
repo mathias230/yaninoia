@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ChatMessage } from "@/types/chat";
@@ -23,7 +22,6 @@ export function ConversationView({ messages, isLoading }: ConversationViewProps)
   }, [messages]);
 
   if (isLoading) {
-    // This can be a more elaborate loading state if needed
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <p>Loading conversation...</p>
@@ -51,3 +49,4 @@ export function ConversationView({ messages, isLoading }: ConversationViewProps)
     </ScrollArea>
   );
 }
+
