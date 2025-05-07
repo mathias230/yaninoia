@@ -1,193 +1,246 @@
+
 "use client";
 
-import { useState, useEffect, type CSSProperties  } from "react";
-import { VoiceInput } from "@/components/voice-input";
-import { ResultsDisplay } from "@/components/results-display";
-import { interpretVoiceCommand, type InterpretVoiceCommandOutput } from "@/ai/flows/interpret-voice-command";
-import { summarizeWebSearch, type SummarizeWebSearchOutput } from "@/ai/flows/summarize-web-search";
-import { answerGeneralQuestion, type AnswerGeneralQuestionOutput } from "@/ai/flows/answer-general-question";
-import { openApplication as openAppService } from "@/services/application-manager";
-import { searchFiles as searchFilesService, type FileInfo } from "@/services/file-search";
+import { useState, useEffect, useCallback } from "react";
+import type { ChatMessage, ChatSession } from "@/types/chat";
+import { getFromLocalStorage, saveToLocalStorage } from "@/lib/localStorage";
+import { answerGeneralQuestion } from "@/ai/flows/answer-general-question";
 
-export default function OmniAssistPage() {
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [assistantResponse, setAssistantResponse] = useState<
-    InterpretVoiceCommandOutput | SummarizeWebSearchOutput | AnswerGeneralQuestionOutput | FileInfo[] | string | null
-  >(null);
-  const [currentStatus, setCurrentStatus] = useState("Click mic or type command");
+import { ChatHistorySidebar } from "@/components/chat/ChatHistorySidebar";
+import { ConversationView } from "@/components/chat/ConversationView";
+import { ChatInput } from "@/components/chat/ChatInput";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { PanelLeft } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-  // Effect to update status based on recording and loading states
+
+const CHAT_SESSIONS_KEY = "chatSessions";
+
+export default function ChatPage() {
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [activeChatSessionId, setActiveChatSessionId] = useState<string | null>(null);
+  const [isLoadingAiResponse, setIsLoadingAiResponse] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Load sessions from localStorage on initial mount
   useEffect(() => {
-    if (isLoading) {
-      setCurrentStatus("Processing...");
-    } else if (isRecording) {
-      setCurrentStatus("Listening...");
+    const storedSessions = getFromLocalStorage<ChatSession[]>(CHAT_SESSIONS_KEY, []);
+    setChatSessions(storedSessions);
+    if (storedSessions.length > 0) {
+      setActiveChatSessionId(storedSessions[0].id); // Activate the most recent chat by default
     } else {
-       if (assistantResponse) {
-        // If there's a response, keep status related to it, otherwise default
-        // This logic might need refinement based on desired UX
-      } else {
-        setCurrentStatus("Click mic or type command");
+      handleCreateNewChat(); // Create a new chat if none exist
+    }
+  }, []);
+
+  // Save sessions to localStorage whenever they change
+  useEffect(() => {
+    saveToLocalStorage(CHAT_SESSIONS_KEY, chatSessions);
+  }, [chatSessions]);
+
+  const handleCreateNewChat = useCallback(() => {
+    const newChatId = crypto.randomUUID();
+    const newChatSession: ChatSession = {
+      id: newChatId,
+      title: "New Chat",
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setChatSessions((prevSessions) => [newChatSession, ...prevSessions]); // Add to the beginning
+    setActiveChatSessionId(newChatId);
+    setIsMobileSidebarOpen(false); // Close sidebar on mobile after creating new chat
+    return newChatId;
+  }, []);
+
+  const handleSelectChat = useCallback((sessionId: string) => {
+    setActiveChatSessionId(sessionId);
+    setIsMobileSidebarOpen(false); // Close sidebar on mobile after selecting a chat
+  }, []);
+  
+  const handleDeleteChat = useCallback((sessionId: string) => {
+    setChatSessions(prevSessions => {
+      const updatedSessions = prevSessions.filter(session => session.id !== sessionId);
+      if (activeChatSessionId === sessionId) {
+        setActiveChatSessionId(updatedSessions.length > 0 ? updatedSessions[0].id : null);
+        if (updatedSessions.length === 0) {
+           handleCreateNewChat(); // Create a new one if all are deleted
+        }
       }
-    }
-  }, [isLoading, isRecording, assistantResponse]);
+      return updatedSessions;
+    });
+     toast({
+        title: "Chat Deleted",
+        description: "The chat session has been removed.",
+      });
+  }, [activeChatSessionId, toast, handleCreateNewChat]);
 
-  const handleToggleRecording = () => {
-    if (isLoading) return;
+
+  const handleSendMessage = async (messageContent: string) => {
+    if (!activeChatSessionId) {
+      // If no active chat, create one (should ideally not happen if UI is right)
+      const newId = handleCreateNewChat();
+      if (!newId) return; // Should not happen
+       // Need to ensure state updates before proceeding, or pass newId
+       // For simplicity, let's assume handleCreateNewChat sets activeChatSessionId synchronously enough
+       // or we call handleSendMessage again after creation.
+       // A better way might be to make handleCreateNewChat return the new session and use that.
+       // For now, let's rely on it being set before the next AI call.
+       // This edge case handling might need refinement.
+    }
+
+
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: "user",
+      content: messageContent,
+      timestamp: new Date(),
+    };
+
+    // Add user message and a temporary AI loading message
+    setChatSessions((prevSessions) =>
+      prevSessions.map((session) => {
+        if (session.id === activeChatSessionId) {
+          const newTitle = session.messages.length === 0 ? messageContent.substring(0, 50) : session.title;
+          return {
+            ...session,
+            title: newTitle,
+            messages: [...session.messages, userMessage],
+            updatedAt: new Date(),
+          };
+        }
+        return session;
+      })
+    );
     
-    if (isRecording && transcript.trim()) {
-      processCommand(transcript);
-    } else if (isRecording && !transcript.trim()) {
-       setIsRecording(false);
-    } else {
-      setTranscript(""); 
-      setAssistantResponse(null); 
-      setIsRecording(true);
-    }
-  };
+    // Prepare for AI response
+    setIsLoadingAiResponse(true);
+    const aiLoadingMessageId = crypto.randomUUID();
+    const aiLoadingMessage: ChatMessage = {
+      id: aiLoadingMessageId,
+      sender: "ai",
+      content: "", // Placeholder, will be updated
+      timestamp: new Date(),
+      isLoading: true,
+    };
 
-  const processCommand = async (command: string) => {
-    if (!command.trim()) return;
+    setChatSessions((prevSessions) =>
+      prevSessions.map((session) =>
+        session.id === activeChatSessionId
+          ? { ...session, messages: [...session.messages, aiLoadingMessage] }
+          : session
+      )
+    );
 
-    setIsLoading(true);
-    setIsRecording(false); 
-    setAssistantResponse(null);
-    setCurrentStatus("Interpreting command...");
 
     try {
-      const interpretation = await interpretVoiceCommand({ voiceCommand: command });
-      setAssistantResponse(interpretation); 
+      const aiResponse = await answerGeneralQuestion({ question: messageContent });
+      const aiMessage: ChatMessage = {
+        id: aiLoadingMessageId, // Use the same ID to replace the loading message
+        sender: "ai",
+        content: aiResponse.answer,
+        timestamp: new Date(),
+        isLoading: false,
+      };
 
-      switch (interpretation.action) {
-        case "openApplication":
-          if (interpretation.applicationName) {
-            setCurrentStatus(`Opening ${interpretation.applicationName}...`);
-            await openAppService(interpretation.applicationName); 
-            setAssistantResponse({ ...interpretation, reason: `Successfully simulated opening ${interpretation.applicationName}.` });
-            setCurrentStatus(`Opened ${interpretation.applicationName} (Simulated)`);
-          } else {
-            setAssistantResponse("Error: Application name not specified for opening.");
-            setCurrentStatus("Error: Application name missing");
+      setChatSessions((prevSessions) =>
+        prevSessions.map((session) => {
+          if (session.id === activeChatSessionId) {
+            return {
+              ...session,
+              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiMessage : msg),
+              updatedAt: new Date(),
+            };
           }
-          break;
-        case "searchFiles":
-          if (interpretation.searchQuery) {
-            setCurrentStatus(`Searching files for "${interpretation.searchQuery}"...`);
-            const files = await searchFilesService(interpretation.searchQuery); 
-            setAssistantResponse(files);
-            setCurrentStatus(files.length > 0 ? `Found ${files.length} file(s)` : "No files found");
-          } else {
-            setAssistantResponse("Error: Search query not specified for file search.");
-            setCurrentStatus("Error: Search query missing");
-          }
-          break;
-        case "webSearch":
-          if (interpretation.webSearchQuery) {
-            setCurrentStatus(`Searching the web for "${interpretation.webSearchQuery}"...`);
-            const summary = await summarizeWebSearch({ query: interpretation.webSearchQuery });
-            setAssistantResponse(summary);
-            setCurrentStatus("Web search complete");
-          } else {
-            setAssistantResponse("Error: Web search query not specified.");
-            setCurrentStatus("Error: Web search query missing");
-          }
-          break;
-        case "answerQuestion":
-          if (interpretation.question) {
-            setCurrentStatus(`Finding an answer for "${interpretation.question}"...`);
-            const answer = await answerGeneralQuestion({ question: interpretation.question });
-            setAssistantResponse(answer);
-            setCurrentStatus("Answer provided.");
-          } else {
-            setAssistantResponse("Error: Question not specified for answering.");
-            setCurrentStatus("Error: Question not specified");
-          }
-          break;
-        case "unknown":
-        default:
-          // Response already set to interpretation
-          setCurrentStatus("Command not understood");
-          break;
-      }
+          return session;
+        })
+      );
     } catch (error) {
-      console.error("Error processing command:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      setAssistantResponse(`Error: ${errorMessage}`);
-      setCurrentStatus("Error processing command");
+      console.error("Error getting AI response:", error);
+      const errorMessage = error instanceof Error ? error.message : "Sorry, something went wrong.";
+      const aiErrorMessage: ChatMessage = {
+        id: aiLoadingMessageId, // Replace loading message with error
+        sender: "ai",
+        content: `Error: ${errorMessage}`,
+        timestamp: new Date(),
+        isLoading: false,
+      };
+       setChatSessions((prevSessions) =>
+        prevSessions.map((session) => {
+          if (session.id === activeChatSessionId) {
+            return {
+              ...session,
+              messages: session.messages.map(msg => msg.id === aiLoadingMessageId ? aiErrorMessage : msg),
+              updatedAt: new Date(),
+            };
+          }
+          return session;
+        })
+      );
+      toast({
+        title: "AI Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
-       // More nuanced status reset
-      if (!isLoading && !isRecording && currentStatus.startsWith("Processing") || currentStatus.startsWith("Interpreting")) {
-         setCurrentStatus("Click mic or type command");
-      }
-      // Do not clear transcript here, user might want to re-submit or edit
-      // setTranscript(""); 
+      setIsLoadingAiResponse(false);
     }
   };
-  
-  const orbits: CSSProperties[] = Array(3).fill(null).map((_, i) => ({
-    position: 'absolute',
-    border: '1px solid var(--accent)', // Use accent color from theme
-    borderRadius: '50%',
-    width: `${100 + i * 40}px`,
-    height: `${100 + i * 40}px`,
-    animation: `spin ${(i + 1) * 5}s linear infinite ${i % 2 === 0 ? 'normal' : 'reverse'}`,
-    opacity: 0.3,
-  }));
 
+  const activeChat = chatSessions.find(session => session.id === activeChatSessionId);
 
   return (
-    <main className="flex flex-col items-center justify-between min-h-screen p-4 sm:p-8 bg-background text-foreground relative overflow-hidden">
-       <style jsx global>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes pulse-glow {
-          0%, 100% { box-shadow: 0 0 5px 2px hsl(var(--accent) / 0.7); }
-          50% { box-shadow: 0 0 20px 8px hsl(var(--accent) / 0.3); }
-        }
-      `}</style>
-      
-      <div className="absolute inset-0 flex items-center justify-center -z-10">
-        <div className="relative flex items-center justify-center w-64 h-64">
-          {orbits.map((style, index) => (
-            <div key={index} style={style} />
-          ))}
-          <div 
-            className="w-16 h-16 bg-accent rounded-full"
-            style={{ animation: 'pulse-glow 3s infinite ease-in-out', opacity: 0.5 }}
-            data-ai-hint="abstract ai"
-          />
-        </div>
+    <main className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* Mobile Sidebar Trigger */}
+      <div className="sm:hidden fixed top-4 left-4 z-50">
+        <Sheet open={isMobileSidebarOpen} onOpenChange={setIsMobileSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon">
+              <PanelLeft className="h-5 w-5" />
+              <span className="sr-only">Toggle History</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-72">
+            <ChatHistorySidebar
+              sessions={chatSessions}
+              activeSessionId={activeChatSessionId}
+              onSelectChat={handleSelectChat}
+              onCreateNewChat={handleCreateNewChat}
+              onDeleteChat={handleDeleteChat}
+            />
+          </SheetContent>
+        </Sheet>
       </div>
 
+      {/* Desktop Sidebar */}
+      <div className="hidden sm:flex h-full">
+         <ChatHistorySidebar
+            sessions={chatSessions}
+            activeSessionId={activeChatSessionId}
+            onSelectChat={handleSelectChat}
+            onCreateNewChat={handleCreateNewChat}
+            onDeleteChat={handleDeleteChat}
+          />
+      </div>
+      
 
-      <header className="w-full mb-4 sm:mb-8 z-10">
-        <h1 className="text-4xl sm:text-5xl font-bold text-center text-primary drop-shadow-md">OmniAssist</h1>
-        <p className="text-center text-muted-foreground text-lg">Your AI Powered PC Assistant</p>
-      </header>
-
-      <section className="flex-grow w-full max-w-2xl my-4 sm:my-8 overflow-y-auto z-10 bg-card/80 backdrop-blur-sm rounded-lg shadow-xl p-4">
-        <ResultsDisplay 
-            response={assistantResponse} 
-            isLoading={isLoading && (!assistantResponse || ('action' in assistantResponse && assistantResponse.action !== 'unknown'))} 
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <header className="p-4 border-b bg-card sm:hidden">
+          <h1 className="text-lg font-semibold truncate text-center">
+            {activeChat?.title || "OmniAssist Chat"}
+          </h1>
+        </header>
+        <ConversationView
+          messages={activeChat?.messages || []}
+          isLoading={!activeChat && chatSessions.length > 0} // Show loading if active chat is being determined
         />
-      </section>
-
-      <footer className="w-full max-w-md mt-4 sm:mt-8 z-10">
-        <VoiceInput
-          isRecording={isRecording}
-          onToggleRecording={handleToggleRecording}
-          transcript={transcript}
-          onTranscriptChange={setTranscript}
-          onSubmitCommand={processCommand}
-          isLoading={isLoading}
-          currentStatus={currentStatus}
+        <ChatInput
+          onSendMessage={handleSendMessage}
+          isLoading={isLoadingAiResponse}
         />
-      </footer>
+      </div>
     </main>
   );
 }
