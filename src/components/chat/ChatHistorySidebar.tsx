@@ -26,7 +26,7 @@ export function ChatHistorySidebar({
   onDeleteChat,
 }: ChatHistorySidebarProps) {
 
-  const handleDelete = (e: React.MouseEvent, sessionId: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation(); // Prevent chat selection when clicking delete
     if (window.confirm("Are you sure you want to delete this chat session?")) {
       onDeleteChat(sessionId);
@@ -34,7 +34,7 @@ export function ChatHistorySidebar({
   };
 
   return (
-    <div className="w-full h-full sm:w-72 bg-card text-card-foreground border-r flex flex-col shadow-lg">
+    <div className="w-full h-full sm:w-72 bg-sidebar text-sidebar-foreground border-r flex flex-col shadow-lg">
       <div className="p-4 border-b flex items-center justify-between space-x-2">
         <Button onClick={onCreateNewChat} className="flex-grow" variant="outline">
           <PlusCircle className="mr-2 h-4 w-4" /> New Chat
@@ -50,7 +50,7 @@ export function ChatHistorySidebar({
         ) : (
           <nav className="p-2 space-y-1">
             {sessions.map((session) => (
-              <div
+              <button
                 key={session.id}
                 role="button"
                 tabIndex={0}
@@ -63,19 +63,25 @@ export function ChatHistorySidebar({
                 }}
                 className={cn(
                   buttonVariants({ variant: "ghost", size: "default" }),
-                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative",
-                   session.id === activeSessionId && "bg-accent text-accent-foreground hover:bg-accent/90"
+                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative text-left",
+                   session.id === activeSessionId && "bg-sidebar-accent text-sidebar-accent-foreground hover:bg-sidebar-accent/90"
                 )}
                 onClick={() => onSelectChat(session.id)}
               >
                 <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
-                <div className="flex-1 truncate text-left mr-2">
-                  <p className="font-medium truncate">{session.title}</p>
+                <div className="flex-1 truncate mr-2">
+                  <p className={cn(
+                      "truncate", 
+                      session.id === activeSessionId ? "font-semibold" : "font-medium"
+                    )}
+                  >
+                    {session.title}
+                  </p>
                   <p className={cn(
                     "text-xs",
                     session.id === activeSessionId 
-                      ? "text-accent-foreground/80" 
-                      : "text-muted-foreground group-hover:text-accent-foreground/70"
+                      ? "text-sidebar-accent-foreground/80" 
+                      : "text-muted-foreground group-hover:text-sidebar-accent-foreground/70"
                   )}>
                     {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true })}
                   </p>
@@ -84,12 +90,12 @@ export function ChatHistorySidebar({
                   variant="ghost" 
                   size="icon" 
                   className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => handleDelete(e, session.id)}
+                  onClick={(e) => handleDeleteClick(e, session.id)}
                   aria-label="Delete chat"
                 >
                   <Trash2 size={16} />
                 </Button>
-              </div>
+              </button>
             ))}
           </nav>
         )}

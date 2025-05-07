@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bot, Loader2, User } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import Image from "next/image";
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -23,7 +24,9 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
     >
       {!isUser && (
         <Avatar className="h-8 w-8 bg-accent text-accent-foreground">
-          {/* <AvatarImage src="/placeholder-ai.jpg" alt="AI Avatar" data-ai-hint="robot avatar" /> */}
+          <AvatarImage asChild src="https://picsum.photos/32/32?random=1" data-ai-hint="robot ai">
+            <Image src="https://picsum.photos/32/32?random=1" alt="AI Avatar" width={32} height={32} />
+          </AvatarImage>
           <AvatarFallback>
             <Bot size={18} />
           </AvatarFallback>
@@ -50,7 +53,9 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       </Card>
       {isUser && (
         <Avatar className="h-8 w-8 bg-secondary text-secondary-foreground">
-          {/* <AvatarImage src="/placeholder-user.jpg" alt="User Avatar" data-ai-hint="person avatar" /> */}
+           <AvatarImage asChild src="https://picsum.photos/32/32?random=2" data-ai-hint="person user">
+            <Image src="https://picsum.photos/32/32?random=2" alt="User Avatar" width={32} height={32} />
+          </AvatarImage>
           <AvatarFallback>
             <User size={18} />
           </AvatarFallback>
