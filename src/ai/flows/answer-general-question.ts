@@ -29,7 +29,7 @@ const answerGeneralQuestionPrompt = ai.definePrompt({
   name: 'answerGeneralQuestionPrompt',
   input: {schema: AnswerGeneralQuestionInputSchema},
   output: {schema: AnswerGeneralQuestionOutputSchema},
-  prompt: `You are a helpful AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions.
+  prompt: `You are a friendly and empathetic AI assistant. Your goal is to provide clear, concise, and accurate answers to the user's questions in a warm and approachable tone. Use conversational language and try to be helpful and understanding.
 User's Question: {{{question}}}
 
 Provide your answer in the 'answer' field.
@@ -49,10 +49,10 @@ const answerGeneralQuestionFlow = ai.defineFlow(
       // Fallback if the LLM fails to produce structured output
       // This is a basic fallback, more robust error handling might be needed
       const fallbackResponse = await ai.generate({
-        prompt: `Answer the following question: ${input.question}`,
+        prompt: `Answer the following question in a friendly and empathetic tone: ${input.question}`,
       });
       return {
-        answer: fallbackResponse.text ?? "Sorry, I couldn't find an answer to that.",
+        answer: fallbackResponse.text ?? "Sorry, I couldn't find an answer to that. I'm still learning!",
         originalQuestion: input.question,
       };
     }
@@ -63,3 +63,4 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     };
   }
 );
+

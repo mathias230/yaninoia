@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlusCircle, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from 'date-fns';
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 
 interface ChatHistorySidebarProps {
@@ -34,10 +35,11 @@ export function ChatHistorySidebar({
 
   return (
     <div className="w-full h-full sm:w-72 bg-card text-card-foreground border-r flex flex-col shadow-lg">
-      <div className="p-4 border-b">
-        <Button onClick={onCreateNewChat} className="w-full" variant="outline">
+      <div className="p-4 border-b flex items-center justify-between space-x-2">
+        <Button onClick={onCreateNewChat} className="flex-grow" variant="outline">
           <PlusCircle className="mr-2 h-4 w-4" /> New Chat
         </Button>
+        <ThemeToggle />
       </div>
       <ScrollArea className="flex-1">
         {sessions.length === 0 ? (
@@ -48,7 +50,7 @@ export function ChatHistorySidebar({
         ) : (
           <nav className="p-2 space-y-1">
             {sessions.map((session) => (
-              <div // Changed from Button to div to avoid nesting
+              <div
                 key={session.id}
                 role="button"
                 tabIndex={0}
@@ -60,7 +62,7 @@ export function ChatHistorySidebar({
                   }
                 }}
                 className={cn(
-                  buttonVariants({ variant: session.id === activeSessionId ? "secondary" : "ghost", size: "default" }),
+                  buttonVariants({ variant: "ghost", size: "default" }),
                   "w-full justify-start h-auto py-2 px-3 group flex items-center relative",
                    session.id === activeSessionId && "bg-accent text-accent-foreground hover:bg-accent/90"
                 )}
@@ -95,4 +97,3 @@ export function ChatHistorySidebar({
     </div>
   );
 }
-
