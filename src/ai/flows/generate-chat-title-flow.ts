@@ -18,7 +18,7 @@ const GenerateChatTitleInputSchema = z.object({
 export type GenerateChatTitleInput = z.infer<typeof GenerateChatTitleInputSchema>;
 
 const GenerateChatTitleOutputSchema = z.object({
-  title: z.string().describe('Un título conciso y relevante para la conversación de chat, idealmente de 3-5 palabras.'),
+  title: z.string().describe('Un título descriptivo y conciso para la conversación de chat que refleje el tema principal de la consulta del usuario.'),
 });
 export type GenerateChatTitleOutput = z.infer<typeof GenerateChatTitleOutputSchema>;
 
@@ -30,12 +30,17 @@ const generateChatTitlePrompt = ai.definePrompt({
   name: 'generateChatTitlePrompt',
   input: {schema: GenerateChatTitleInputSchema},
   output: {schema: GenerateChatTitleOutputSchema},
-  prompt: `Basándote en el siguiente intercambio inicial en una conversación, genera un título corto y conciso (3-5 palabras) que capture el tema principal. La IA en esta conversación se llama Yanino.
+  prompt: `Analiza el primer mensaje del usuario y la primera respuesta de la IA en una conversación. 
+Genera un título descriptivo y conciso para el chat que refleje el tema principal de la consulta del usuario. 
+El título debe ser lo suficientemente detallado como para que el usuario pueda identificar fácilmente el contenido del chat más tarde. 
+Por ejemplo, si el usuario pregunta "códigos de programación para página web para dedicar", un buen título sería "Códigos de programación para dedicar página web".
+Otro ejemplo, si el usuario pregunta "¿Cuál es la receta para la tarta de manzana?", un buen título sería "Receta de tarta de manzana".
+La IA en esta conversación se llama Yanino.
 
 Usuario: "{{userMessage}}"
 Yanino: "{{aiMessage}}"
 
-Sugiere un título para este chat.
+Genera un título para este chat.
 `,
 });
 
@@ -47,8 +52,18 @@ const generateChatTitleFlow = ai.defineFlow(
   },
   async (input: GenerateChatTitleInput) => {
     const {output} = await generateChatTitlePrompt(input);
-    if (!output?.title) {
-        return { title: "Chat con Yanino" };
+    if (!output?.title || output.title.trim() === "") {
+        // Fallback if AI doesn't generate a title or generates an empty one.
+        // Try to create a generic title from the user's message if it's short enough.
+        if (input.userMessage && input.userMessage.length > 0 && input.userMessage.length <= 50) {
+            const firstFewWords = input.userMessage.split(' ').slice(0, 5).join(' ');
+            return { title: firstFewWords + (input.userMessage.split(' ').length > 5 ? '...' : '') };
+        }
+        return { title: "Chat con Yanino" }; // Default fallback
+    }
+    // Ensure the title is not excessively long, Genkit might sometimes ignore length constraints in prompt
+    if (output.title.length > 70) {
+      return { title: output.title.substring(0, 67) + "..." };
     }
     return output;
   }
