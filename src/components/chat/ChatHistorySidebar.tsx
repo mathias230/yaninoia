@@ -2,7 +2,7 @@
 "use client";
 
 import type { ChatSession } from "@/types/chat";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PlusCircle, MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,32 +48,46 @@ export function ChatHistorySidebar({
         ) : (
           <nav className="p-2 space-y-1">
             {sessions.map((session) => (
-              <Button
+              <div // Changed from Button to div to avoid nesting
                 key={session.id}
-                variant={session.id === activeSessionId ? "secondary" : "ghost"}
+                role="button"
+                tabIndex={0}
+                aria-pressed={session.id === activeSessionId}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelectChat(session.id);
+                  }
+                }}
                 className={cn(
-                  "w-full justify-start h-auto py-2 px-3 group",
+                  buttonVariants({ variant: session.id === activeSessionId ? "secondary" : "ghost", size: "default" }),
+                  "w-full justify-start h-auto py-2 px-3 group flex items-center relative",
                    session.id === activeSessionId && "bg-accent text-accent-foreground hover:bg-accent/90"
                 )}
                 onClick={() => onSelectChat(session.id)}
               >
                 <MessageSquare className="mr-2 h-4 w-4 flex-shrink-0" />
-                <div className="flex-1 truncate text-left">
+                <div className="flex-1 truncate text-left mr-2">
                   <p className="font-medium truncate">{session.title}</p>
-                  <p className="text-xs text-muted-foreground group-hover:text-accent-foreground/80">
+                  <p className={cn(
+                    "text-xs",
+                    session.id === activeSessionId 
+                      ? "text-accent-foreground/80" 
+                      : "text-muted-foreground group-hover:text-accent-foreground/70"
+                  )}>
                     {formatDistanceToNow(new Date(session.updatedAt), { addSuffix: true })}
                   </p>
                 </div>
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive-foreground hover:bg-destructive/20 hover:text-destructive"
+                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={(e) => handleDelete(e, session.id)}
                   aria-label="Delete chat"
                 >
                   <Trash2 size={16} />
                 </Button>
-              </Button>
+              </div>
             ))}
           </nav>
         )}
@@ -81,3 +95,4 @@ export function ChatHistorySidebar({
     </div>
   );
 }
+
