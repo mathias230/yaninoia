@@ -8,6 +8,10 @@ import { Bot, Loader2, User, FileText, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import NextImage from "next/image"; 
 import { CodeDisplay } from "./CodeDisplay"; 
+import { useState } from "react";
+import { ImagePreviewModal } from "./ImagePreviewModal";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
@@ -16,11 +20,19 @@ interface ChatMessageBubbleProps {
 
 export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleProps) {
   const isUser = message.sender === "user";
-  const hasImage = !!message.image || (message.file && message.file.type.startsWith("image/"));
-  const imageData = message.image || (message.file && message.file.type.startsWith("image/") ? message.file.dataUri : undefined);
+  const hasImageAttachment = !!message.image || (message.file && message.file.type.startsWith("image/"));
+  const imageDataUri = message.image || (message.file && message.file.type.startsWith("image/") ? message.file.dataUri : undefined);
   const hasGenericFile = message.file && !message.file.type.startsWith("image/");
 
   const hasCode = message.extractedCodeBlocks && message.extractedCodeBlocks.length > 0;
+
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  const handleImageClick = (url: string) => {
+    setPreviewImageUrl(url);
+    setIsImagePreviewOpen(true);
+  };
 
   return (
     <div
@@ -57,18 +69,23 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
               </div>
             ) : (
               <>
-                {imageData && (
-                  <div className="mb-2 rounded-md overflow-hidden max-h-80">
+                {imageDataUri && (
+                  <button
+                    type="button"
+                    onClick={() => handleImageClick(imageDataUri)}
+                    className="mb-2 rounded-md overflow-hidden max-h-80 block hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                    aria-label={`Abrir vista previa de imagen: ${message.file?.name || "Imagen adjunta"}`}
+                  >
                     <NextImage 
-                      src={imageData} 
-                      alt={message.file?.name || "Imagen subida por el usuario"} 
+                      src={imageDataUri} 
+                      alt={message.file?.name || "Imagen adjunta por el usuario"} 
                       width={300} 
                       height={200} 
                       className="object-contain w-full h-auto max-h-80" 
-                      unoptimized={imageData.startsWith('data:image')} 
+                      unoptimized={imageDataUri.startsWith('data:image')} 
                       data-ai-hint="attached image"
                     />
-                  </div>
+                  </button>
                 )}
                 {hasGenericFile && message.file && (
                   <div className="mb-2 p-2 border rounded-md flex items-center gap-2 bg-background/10 dark:bg-foreground/10">
@@ -76,12 +93,24 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
                     <span className="text-sm truncate" title={message.file.name}>{message.file.name}</span>
                   </div>
                 )}
-                {message.content && (!hasCode || (hasCode && !message.extractedCodeBlocks?.every(block => message.content.includes(`\`\`\`${block.language || ''}\n${block.code}\n\`\`\``)))) && (
-                   <p className="whitespace-pre-wrap text-sm sm:text-base">{message.content}</p>
+                {message.content && (
+                   <div className="prose prose-sm sm:prose-base max-w-none dark:prose-invert text-sm sm:text-base text-current">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        // Render nothing for 'pre' tags, as CodeDisplay handles them separately
+                        pre: ({node, ...props}) => null,
+                        // Ensure links open in new tabs
+                        a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  </div>
                 )}
-                {!message.content && (imageData || hasGenericFile) && isUser && (
-                  <p className="whitespace-pre-wrap text-sm sm:text-base italic opacity-80">
-                    {imageData && <ImageIcon size={14} className="inline mr-1"/>}
+                {!message.content && (imageDataUri || hasGenericFile) && isUser && (
+                  <p className="text-sm sm:text-base italic opacity-80">
+                    {imageDataUri && <ImageIcon size={14} className="inline mr-1"/>}
                     {hasGenericFile && <FileText size={14} className="inline mr-1"/>}
                     Adjunto enviado
                   </p>
@@ -105,6 +134,17 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
             <User size={18} />
           </AvatarFallback>
         </Avatar>
+      )}
+      {previewImageUrl && (
+        <ImagePreviewModal
+          isOpen={isImagePreviewOpen}
+          onClose={() => {
+            setIsImagePreviewOpen(false);
+            setPreviewImageUrl(null);
+          }}
+          imageUrl={previewImageUrl}
+          altText={message.file?.name || (isUser ? "Imagen subida por el usuario" : `Imagen de ${aiName}`)}
+        />
       )}
     </div>
   );
