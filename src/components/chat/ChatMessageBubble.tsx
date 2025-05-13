@@ -4,7 +4,7 @@
 import type { ChatMessage } from "@/types/chat";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Bot, Loader2, User, FileText, Image as ImageIcon } from "lucide-react";
+import { Bot, User, FileText, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import NextImage from "next/image"; 
 import { CodeDisplay } from "./CodeDisplay"; 
@@ -37,7 +37,7 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
   return (
     <div
       className={cn(
-        "flex items-start gap-3 mb-4 w-full", 
+        "flex items-start gap-3 mb-4 w-full animate-message-enter", 
         isUser ? "justify-end" : "justify-start"
       )}
     >
@@ -62,10 +62,14 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
           )}
         >
           <CardContent className="p-3">
-            {message.isLoading ? (
-              <div className="flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Pensando...</span>
+            {message.isLoading && !isUser ? (
+              <div className="flex items-center gap-2 text-current">
+                <div className="animate-typing-dots flex gap-1">
+                  <span className="h-2 w-2 rounded-full bg-current"></span>
+                  <span className="h-2 w-2 rounded-full bg-current"></span>
+                  <span className="h-2 w-2 rounded-full bg-current"></span>
+                </div>
+                <span>{aiName} está escribiendo</span>
               </div>
             ) : (
               <>
@@ -73,14 +77,14 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
                   <button
                     type="button"
                     onClick={() => handleImageClick(imageDataUri)}
-                    className="mb-2 rounded-md overflow-hidden max-h-80 block hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
+                    className="mb-2 rounded-md overflow-hidden max-h-80 block w-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer"
                     aria-label={`Abrir vista previa de imagen: ${message.file?.name || "Imagen adjunta"}`}
                   >
                     <NextImage 
                       src={imageDataUri} 
                       alt={message.file?.name || "Imagen adjunta por el usuario"} 
-                      width={300} 
-                      height={200} 
+                      width={400} // Increased base width for better display
+                      height={300} // Increased base height
                       className="object-contain w-full h-auto max-h-80" 
                       unoptimized={imageDataUri.startsWith('data:image')} 
                       data-ai-hint="attached image"
@@ -98,9 +102,7 @@ export function ChatMessageBubble({ message, aiName = "IA" }: ChatMessageBubbleP
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
-                        // Render nothing for 'pre' tags, as CodeDisplay handles them separately
                         pre: ({node, ...props}) => null,
-                        // Ensure links open in new tabs
                         a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />,
                       }}
                     >
