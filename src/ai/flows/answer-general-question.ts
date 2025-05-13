@@ -21,12 +21,12 @@ const ConversationMessageSchema = z.object({
 // Esquema para la entrada que el prompt mismo espera (interno, incluye campos preprocesados)
 const AnswerGeneralQuestionPromptInputSchema = z.object({
   question: z.string().describe('La pregunta o instrucción actual hecha por el usuario.'),
-  imageDataUri: z.string().optional().describe("Una imagen opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
+  imageDataUri: z.string().optional().describe("Una imagen principal opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'. Esta imagen debe ser el foco principal del análisis visual si está presente."),
   fileData: z.object({
     name: z.string().describe('El nombre del archivo subido.'),
     type: z.string().describe('El tipo MIME del archivo subido.'),
     dataUri: z.string().describe("El contenido del archivo subido, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
-  }).optional().describe('Un archivo opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él.'),
+  }).optional().describe('Un archivo adicional opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él. Puede ser un archivo de texto, otra imagen, etc.'),
   conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo. Úsalo para mantener el contexto.'),
   // Campos para datos de archivo preprocesados, a ser poblados por el flujo para el prompt
   fileIsText: z.boolean().optional().describe('Campo interno: Si el archivo subido se determina que es un archivo de texto.'),
@@ -39,13 +39,13 @@ type AnswerGeneralQuestionPromptInput = z.infer<typeof AnswerGeneralQuestionProm
 // Esquema para la entrada que la función exportada de cara al usuario y el flujo tomarán
 const AnswerGeneralQuestionUserFacingInputSchema = z.object({
   question: z.string().describe('La pregunta o instrucción actual hecha por el usuario.'),
-  imageDataUri: z.string().optional().describe("Una imagen opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
+  imageDataUri: z.string().optional().describe("Una imagen principal opcional proporcionada por el usuario con la pregunta actual, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
   fileData: z.object({
     name: z.string().describe('El nombre del archivo subido.'),
     type: z.string().describe('El tipo MIME del archivo subido.'),
     dataUri: z.string().describe("El contenido del archivo subido, como un URI de datos. Formato: 'data:<mimetype>;base64,<encoded_data>'."),
-  }).optional().describe('Un archivo opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él.'),
-  conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo. Úsalo para mantener el contexto.'),
+  }).optional().describe('Un archivo adicional opcional proporcionado por el usuario con la pregunta actual.'),
+  conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo.'),
 });
 export type AnswerGeneralQuestionUserFacingInput = z.infer<typeof AnswerGeneralQuestionUserFacingInputSchema>;
 
@@ -85,25 +85,38 @@ console.log('mundo');
 Ahora, considerando el historial anterior, por favor responde a lo siguiente:
 {{/if}}
 
-Entrada Actual del Usuario: {{{question}}}
+Pregunta/Instrucción del Usuario: {{{question}}}
 
 {{#if imageDataUri}}
-El usuario también ha proporcionado una imagen con su entrada actual. Analiza esta imagen como parte de tu respuesta:
+El usuario ha adjuntado la siguiente imagen principal. Por favor, analízala detenidamente y úsala como base para tu respuesta, junto con la pregunta/instrucción del usuario:
 {{media url=imageDataUri}}
 {{/if}}
 
 {{#if fileData}}
-El usuario también ha subido un archivo llamado "{{fileData.name}}" (tipo: {{fileData.type}}) con su entrada actual.
-Por favor, analiza su contenido y ayuda al usuario con él. Puedes ayudar a entender, resumir o responder preguntas sobre este archivo.
-Referencia del Archivo: {{fileData.name}} (tipo: {{fileData.type}})
-{{#if fileIsText}}
-Contenido del Archivo (primeros 2000 caracteres):
-\`\`\`
-{{{fileTextPreview}}}
-\`\`\`
-{{else}}
-Este es un archivo no textual. Puedes discutir sus posibles contenidos o usos basándote en su nombre y tipo.
-{{/if}}
+  {{#if imageDataUri}}
+  Adicionalmente, el usuario ha subido el siguiente archivo:
+  {{else}}
+  El usuario ha subido el siguiente archivo:
+  {{/if}}
+  Nombre del archivo: "{{fileData.name}}"
+  Tipo de archivo: "{{fileData.type}}"
+
+  {{#if fileData.type.startsWith "image/"}}
+    {{#unless imageDataUri}} {{!-- Solo mostrar/analizar fileData como media si no existe imageDataUri primario --}}
+    Este archivo es una imagen. Por favor, analízala:
+    {{media url=fileData.dataUri}}
+    {{else}} {{!-- Imagen primaria ya mostrada mediante imageDataUri --}}
+    Este archivo adjunto también es una imagen. Menciona si es relevante como complemento al análisis de la imagen principal.
+    {{/unless}}
+  {{else if fileIsText}}
+    Este archivo es de texto. Aquí tienes una vista previa de su contenido (primeros 2000 caracteres):
+    \`\`\`
+    {{{fileTextPreview}}}
+    \`\`\`
+    Por favor, analiza este texto en relación con la pregunta/instrucción del usuario.
+  {{else}}
+    Este es un archivo de tipo "{{fileData.type}}". No se puede mostrar una vista previa. Basa tu análisis en el nombre y tipo del archivo en relación con la pregunta/instrucción del usuario.
+  {{/if}}
 {{/if}}
 
 Proporciona tu respuesta en el campo 'answer'.
@@ -115,10 +128,14 @@ También, devuelve la pregunta actual original en el campo 'originalQuestion', q
 const dataUriToString = (dataUri: string): string => {
   try {
     const base64Part = dataUri.substring(dataUri.indexOf(',') + 1);
-    if (typeof Buffer !== 'undefined') {
+    // Asegurar que Buffer solo se usa en entorno Node.js
+    if (typeof Buffer !== 'undefined' && typeof Buffer.from === 'function') {
       return Buffer.from(base64Part, 'base64').toString('utf-8');
+    } else if (typeof atob === 'function') { // Usar atob en el navegador
+      return atob(base64Part);
     }
-    return atob(base64Part);
+    console.warn("No se pudo decodificar el URI de datos a cadena: ni Buffer ni atob están disponibles.");
+    return "[No se pudo decodificar el contenido del archivo]";
   } catch (e) {
     console.warn("No se pudo decodificar el URI de datos a cadena", e);
     return "[No se pudo decodificar el contenido del archivo]";
@@ -146,6 +163,7 @@ const answerGeneralQuestionFlow = ai.defineFlow(
         const fileContent = dataUriToString(userInput.fileData.dataUri);
         promptInput.fileTextPreview = fileContent.substring(0, 2000);
       }
+      // No es necesario pasar fileData.dataUri como media aquí si es imagen; el prompt lo maneja.
     }
 
     const {output} = await answerGeneralQuestionPrompt(promptInput); 
@@ -153,8 +171,9 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     if (!output) {
       let fallbackAnswer = "Lo siento, no pude encontrar una respuesta a eso. ¡Todavía estoy aprendiendo!";
       try {
+        // Generar una respuesta de respaldo simple si la salida estructurada falla
         const fallbackResponse = await ai.generate({
-          prompt: `Como Yanino, responde la siguiente pregunta en un tono amigable y empático: ${userInput.question}`,
+          prompt: `Como Yanino, responde la siguiente pregunta de manera amigable y empática: ${userInput.question}${userInput.imageDataUri ? " (El usuario también envió una imagen)." : ""}${userInput.fileData ? ` (El usuario también envió un archivo llamado ${userInput.fileData.name}).` : ""}`,
         });
         if (fallbackResponse.text) {
           fallbackAnswer = fallbackResponse.text;
@@ -169,6 +188,7 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     }
     return {
       ...output,
+      // Asegurarse de que originalQuestion siempre se popule, incluso si el LLM lo omite.
       originalQuestion: output.originalQuestion || userInput.question, 
     };
   }

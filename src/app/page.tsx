@@ -174,15 +174,24 @@ export default function ChatPage() {
 
     if (currentChatId === null || currentSessionIndex === -1) {
         currentChatId = handleCreateNewChat();
-        currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId); 
-        // Need to update index if a new chat was just created and handleCreateNewChat is async (it's not, but good practice)
-        if (currentSessionIndex === -1) { // Safeguard
-          const newSession = chatSessions.find(session => session.id === currentChatId);
-          if (newSession) currentSessionIndex = chatSessions.indexOf(newSession);
+        // After creating a new chat, find its index again as the array has changed.
+        currentSessionIndex = chatSessions.findIndex(session => session.id === currentChatId);
+         // Fallback logic in case chatSessions hasn't updated immediately (should not be an issue with sync handleCreateNewChat)
+        if (currentSessionIndex === -1) {
+           const newSessionJustAdded = chatSessions.find(s => s.id === currentChatId);
+           if (newSessionJustAdded) {
+             currentSessionIndex = chatSessions.indexOf(newSessionJustAdded);
+           } else { // Extremely unlikely, but a safeguard.
+             console.error("Failed to find newly created chat session index immediately.");
+             return;
+           }
         }
     }
     
-    if (!currentChatId || currentSessionIndex === -1) return; 
+    if (!currentChatId || currentSessionIndex === -1) {
+      console.error("No active or valid chat session ID found for sending message.");
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -195,7 +204,6 @@ export default function ChatPage() {
     
     const sessionBeforeUserMessage = chatSessions[currentSessionIndex];
     const isFirstUserMessageInSession = sessionBeforeUserMessage?.messages.filter(m => m.sender === 'user' && !m.isLoading).length === 0;
-
 
     setChatSessions((prevSessions) =>
       prevSessions.map((session) => {
@@ -277,8 +285,11 @@ export default function ChatPage() {
 
       if (isFirstUserMessageInSession && sessionBeforeUserMessage?.title === DEFAULT_CHAT_TITLE && currentChatId) {
         try {
+          const titleUserMessageContent = userMessage.content || 
+                                          (userMessage.image ? "Análisis de imagen" : 
+                                          (userMessage.file ? `Consulta sobre archivo: ${userMessage.file.name}` : "Conversación iniciada"));
           const titleResponse = await generateChatTitle({
-            userMessage: userMessage.content || (userMessage.image ? "Imagen recibida" : userMessage.file ? `Archivo recibido: ${userMessage.file.name}` : "Interacción iniciada"),
+            userMessage: titleUserMessageContent,
             aiMessage: aiMessage.content,
           });
           if (titleResponse.title) {
@@ -297,7 +308,6 @@ export default function ChatPage() {
           console.warn("Error al generar el título del chat:", titleError);
         }
       }
-
 
     } catch (error) {
       console.error("Error al obtener respuesta de la IA:", error);
@@ -457,4 +467,3 @@ export default function ChatPage() {
     </main>
   );
 }
-
