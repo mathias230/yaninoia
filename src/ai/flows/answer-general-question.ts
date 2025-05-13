@@ -29,8 +29,9 @@ const AnswerGeneralQuestionPromptInputSchema = z.object({
   }).optional().describe('Un archivo adicional opcional proporcionado por el usuario con la pregunta actual para análisis, resumen o para responder preguntas sobre él. Puede ser un archivo de texto, otra imagen, etc.'),
   conversationHistory: z.array(ConversationMessageSchema).optional().describe('El historial de la conversación actual, ordenado del más antiguo al más nuevo. Úsalo para mantener el contexto.'),
   // Campos para datos de archivo preprocesados, a ser poblados por el flujo para el prompt
-  fileIsText: z.boolean().optional().describe('Campo interno: Si el archivo subido se determina que es un archivo de texto.'),
-  fileTextPreview: z.string().optional().describe('Campo interno: Una vista previa del contenido de texto (primeros 2000 caracteres) si el archivo es basado en texto.')
+  fileIsImage: z.boolean().optional().describe('Campo interno: Indica si el archivo adjunto (fileData) es una imagen.'),
+  fileIsText: z.boolean().optional().describe('Campo interno: Indica si el archivo adjunto (fileData) es de texto (y no una imagen).'),
+  fileTextPreview: z.string().optional().describe('Campo interno: Vista previa del contenido si fileIsText es true.')
 });
 // Este tipo es para uso interno dentro del flujo, para el prompt.
 type AnswerGeneralQuestionPromptInput = z.infer<typeof AnswerGeneralQuestionPromptInputSchema>;
@@ -101,7 +102,7 @@ El usuario ha adjuntado la siguiente imagen principal. Por favor, analízala det
   Nombre del archivo: "{{fileData.name}}"
   Tipo de archivo: "{{fileData.type}}"
 
-  {{#if fileData.type.startsWith "image/"}}
+  {{#if fileIsImage}}
     {{#unless imageDataUri}} {{!-- Solo mostrar/analizar fileData como media si no existe imageDataUri primario --}}
     Este archivo es una imagen. Por favor, analízala:
     {{media url=fileData.dataUri}}
@@ -158,12 +159,14 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     };
 
     if (userInput.fileData) {
-      promptInput.fileIsText = userInput.fileData.type.startsWith("text");
+      promptInput.fileIsImage = userInput.fileData.type.startsWith("image/");
+      // Solo tratar como texto si no es una imagen Y comienza explícitamente con "text/"
+      promptInput.fileIsText = !promptInput.fileIsImage && userInput.fileData.type.startsWith("text/");
+      
       if (promptInput.fileIsText) {
         const fileContent = dataUriToString(userInput.fileData.dataUri);
         promptInput.fileTextPreview = fileContent.substring(0, 2000);
       }
-      // No es necesario pasar fileData.dataUri como media aquí si es imagen; el prompt lo maneja.
     }
 
     const {output} = await answerGeneralQuestionPrompt(promptInput); 
