@@ -1,0 +1,18 @@
+
+services:
+  - type: web
+    name: yanino-chat 
+    env: node
+    plan: free # You can change this to 'starter' or other paid plans
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm run start"
+    healthCheckPath: / # Default health check path
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: GOOGLE_API_KEY # Ensure this matches the env var name Genkit/Google AI SDK expects
+        sync: false # This means the value must be set in the Render dashboard
+      # Add any other environment variables your application needs below
+      # Example:
+      # - key: ANOTHER_API_KEY
+      #   value: your_actual_api_key_here_or_set_in_dashboard
