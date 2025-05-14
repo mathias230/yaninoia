@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Un flujo de Genkit para responder preguntas de conocimiento general, potencialmente con contexto de imagen o archivo,
@@ -136,6 +135,14 @@ El usuario ha adjuntado la siguiente imagen principal. Por favor, analízala det
 Proporciona tu respuesta en el campo 'answer'.
 También, devuelve la pregunta actual original en el campo 'originalQuestion', que debe ser la entrada textual del usuario para el turno actual.
 `,
+  config: {
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    ],
+  },
 });
 
 
@@ -190,6 +197,14 @@ const answerGeneralQuestionFlow = ai.defineFlow(
         // Generar una respuesta de respaldo simple si la salida estructurada falla
         const fallbackResponse = await ai.generate({
           prompt: `Como Yanino, un IA amigable, empática y con un toque de humor, responde la siguiente pregunta de manera conversacional: ${userInput.question}${userInput.imageDataUri ? " (El usuario también envió una imagen)." : ""}${userInput.fileData ? ` (El usuario también envió un archivo llamado ${userInput.fileData.name}).` : ""}. Si no sabes, puedes decir algo como '¡Uy! Esa pregunta me agarró desprevenido. 🤔 ¿Podrías intentar de otra forma?'`,
+          config: { // Add safety settings to fallback as well
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+            ],
+          },
         });
         if (fallbackResponse.text) {
           fallbackAnswer = fallbackResponse.text;
@@ -209,4 +224,3 @@ const answerGeneralQuestionFlow = ai.defineFlow(
     };
   }
 );
-
